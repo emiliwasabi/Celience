@@ -59,7 +59,16 @@
           null
         ] },
       { "question": "AFTER A DEMANDING DAY,\nCAN YOU SWITCH OFF?", "hint": "Think about your daily life over the last two weeks.",
-        "options": ["Very easily", "Fairly easily", "With difficulty", "With great difficulty", "It depends on the day", "I’d rather not answer"] }
+        "options": ["Very easily", "Fairly easily", "With difficulty", "With great difficulty", "It depends on the day", "I’d rather not answer"],
+        "_motion": "Switching off: the circle swings left ↔ right (sometimes up ↔ down) for `swing` s, then recentres and rests (`rest` s). difficulty 0..1 = how hard recentring is (0 = direct, higher = overshoots, wobbles, drifts back out). period = s between turns, size = 0..1 of the float area. [min, max] = random each cycle.",
+        "motion": [
+          { "swing": [2.0, 2.5], "period": 0.7, "difficulty": 0,    "rest": [1.6, 2.0], "size": 0.55 },
+          { "swing": [2.0, 2.5], "period": 0.7, "difficulty": 0.3,  "rest": [1.2, 1.6], "size": 0.55 },
+          { "swing": [2.5, 3.0], "period": 0.65, "difficulty": 0.6, "rest": [0.9, 1.2], "size": 0.6 },
+          { "swing": [3.0, 3.5], "period": 0.6, "difficulty": 0.9,  "rest": [0.5, 0.8], "size": 0.6 },
+          { "swing": [2.0, 3.5], "period": [0.6, 0.7], "difficulty": [0, 0.9], "rest": [0.6, 1.8], "size": 0.58 },
+          null
+        ] }
     ]
   },
 

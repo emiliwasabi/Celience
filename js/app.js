@@ -803,7 +803,15 @@
        calm     [min, max] s resting in the centre, then
        burst    [min, max] s of quick, nervous movement — both re-rolled every cycle
        jitter   0..1 extra high-frequency shake during the burst
-       size     0..1 share of the float area used (default 1) */
+       size     0..1 share of the float area used (default 1)
+     "Switching off" answers swing back and forth, then try to recentre:
+       swing      [min, max] s of going left ↔ right (sometimes up ↔ down)
+       period     s between two turns of the swing
+       difficulty 0..1 how hard the recentring is: 0 = direct (eased), higher = it overshoots,
+                  wobbles and drifts back out a few times before it settles
+       rest       [min, max] s resting in the centre before the next swing
+     The swing runs on its own spring that sits in the centre when unused, added to the float —
+     switching between answers never snaps. */
   // defaults: loop = full cycle (s), minAwake = shortest float (s), amp = float size (px),
   // soft / speed = used when the answer does not set its own
   const ORB = { loop: 6, minAwake: 1.5, amp: 60, soft: 2, speed: 0.45 };
@@ -813,7 +821,9 @@
   const orb = { key: null, motion: null, t0: 0, awake: 0, level: 0, lv: 0, prev: null, pos: [0, 0],
                 clock: 0, speed: ORB.speed, soft: ORB.soft, jitter: 0, size: 1, calm: 0, burst: 0,
                 goal: { speed: ORB.speed, soft: ORB.soft, hesitate: 0, jitter: 0, size: 1 },
-                ph: [0, 1, 2, 3, 4].map(() => Math.random() * Math.PI * 2) };
+                ph: [0, 1, 2, 3, 4].map(() => Math.random() * Math.PI * 2),
+                sw: { x: 0, y: 0, vx: 0, vy: 0 }, swing: 0, diff: 0, rest: 0, period: 0.7, swAmp: 0.55,
+                seq: [], relapses: [] };
 
   const roll = (v, d) => (v === undefined ? d : Array.isArray(v) ? v[0] + Math.random() * (v[1] - v[0]) : v);
 
@@ -823,6 +833,23 @@
     orb.awake = clamp(roll(m.awake, ORB.minAwake), ORB.minAwake, ORB.loop);
     orb.calm = roll(m.calm, 0);
     orb.burst = roll(m.burst, 0);
+    if (m.swing) {
+      orb.swing = roll(m.swing, 2);
+      orb.diff = clamp(roll(m.difficulty, 0), 0, 1);
+      orb.rest = roll(m.rest, 1);
+      orb.period = roll(m.period, 0.7);
+      orb.swAmp = roll(m.size, 0.55);
+      orb.recentre = 0.9 + 2.6 * orb.diff;           // the harder, the longer it takes
+      orb.seq = [];
+      // relapses: while recentring it drifts back out, a little less each time
+      const n = Math.round(3 * orb.diff);
+      orb.relapses = Array.from({ length: n }, (_, j) => {
+        const a = Math.random() * Math.PI * 2;
+        const r = 0.55 - 0.12 * j;
+        return { t: ((j + 0.5) / (n + 0.5)) * orb.recentre * 0.75, dur: 0.4 + 0.2 * orb.diff,
+                 x: Math.cos(a) * r, y: Math.sin(a) * r };
+      });
+    }
     orb.goal = { speed: roll(m.speed, ORB.speed), soft: roll(m.soft, ORB.soft), hesitate: roll(m.hesitate, 0),
                  jitter: roll(m.jitter, 0), size: roll(m.size, 1) };
   }
@@ -856,6 +883,7 @@
     // tempo and softness glide toward this loop's values (no sudden change of pace;
     // quicker for stress answers so the shake can pick up fast — still eased)
     const stress = !!(orb.motion && orb.motion.calm);
+    const swinging = !!(orb.motion && orb.motion.swing);
     const g = Math.min(1, dt * (stress ? 6 : 1.2));
     orb.speed += (orb.goal.speed - orb.speed) * g;
     orb.soft += (orb.goal.soft - orb.soft) * g;
@@ -865,10 +893,12 @@
 
     let target = 0;                                            // asleep / no answer / stop
     if (orb.motion) {
-      const cycle = () => (stress ? orb.calm + orb.burst : ORB.loop);
+      const cycle = () => (swinging ? orb.swing + orb.recentre + orb.rest
+        : stress ? orb.calm + orb.burst : ORB.loop);
       while (sim.now - orb.t0 >= cycle()) orbNewLoop(orb.t0 + cycle());
       const t = sim.now - orb.t0;
-      const awake = stress ? t >= orb.calm                     // stress: calm, then a burst
+      const awake = swinging ? false                           // swing: handled by its own spring
+        : stress ? t >= orb.calm                               // stress: calm, then a burst
         : orb.motion.wake ? t >= ORB.loop - orb.awake : t < orb.awake;
       if (awake) {
         // hesitation: the wish to float wavers slowly (smoothed by the spring below → no jolts)
@@ -882,14 +912,50 @@
     orb.lv += (w * w * (target - orb.level) - 2 * w * orb.lv) * dt;
     orb.level = clamp(orb.level + orb.lv * dt, 0, 1);
 
+    // swing spring: target = the current side while swinging, the centre otherwise
+    let sx = 0;
+    let sy = 0;
+    let sw = 4;                                               // stiffness
+    let sz = 1;                                               // damping ratio (1 = no overshoot)
+    if (swinging) {
+      const t = sim.now - orb.t0;
+      const A = ORB.amp * orb.swAmp;
+      if (t < orb.swing) {
+        const k = Math.floor(t / orb.period);
+        for (let n = orb.seq.length; n <= k; n++) {
+          const prev = orb.seq[n - 1];
+          if (n % 2 === 1 && prev) {
+            orb.seq.push([-prev[0], -prev[1]]);               // back to the opposite side
+          } else {
+            const side = Math.random() < 0.5 ? 1 : -1;
+            const across = (Math.random() - 0.5) * 0.4;
+            orb.seq.push(Math.random() < 0.7 ? [side, across] : [across, side]);   // mostly left ↔ right
+          }
+        }
+        [sx, sy] = [orb.seq[k][0] * A, orb.seq[k][1] * A];
+        sw = 7;
+      } else {
+        // recentring: easy = direct and eased; hard = softer, overshoots, drifts back out
+        const tr = t - orb.swing;
+        const rel = orb.relapses.find((r) => tr >= r.t && tr < r.t + r.dur);
+        if (rel) { sx = rel.x * A; sy = rel.y * A; }
+        sw = 4.5 - 1.8 * orb.diff;
+        sz = 1 - 0.6 * orb.diff;
+      }
+    }
+    const S = orb.sw;
+    S.vx += (sw * sw * (sx - S.x) - 2 * sz * sw * S.vx) * dt;
+    S.vy += (sw * sw * (sy - S.y) - 2 * sz * sw * S.vy) * dt;
+    S.x += S.vx * dt; S.y += S.vy * dt;
+
     const [dx, dy] = orbDrift(orb.clock);
     const k = ORB.amp * orb.size * orb.level;
     // idle sway: its own slow clock, so it stays calm whatever the answer's tempo
     const ic = sim.now * ORB_IDLE.speed;
     const ix = ORB_IDLE.amp * (0.7 * Math.sin(ic * 1.3 + orb.ph[1]) + 0.3 * Math.sin(ic * 2.3 + orb.ph[3]));
     const iy = ORB_IDLE.amp * (0.7 * Math.sin(ic * 1.1 + orb.ph[0]) + 0.3 * Math.sin(ic * 1.9 + orb.ph[2]));
-    const x = dx * k + ix;
-    const y = dy * k + iy;
+    const x = dx * k + S.x + ix;
+    const y = dy * k + S.y + iy;
     orb.pos = [x, y];
     $('quizOrb').style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px)';
   }
