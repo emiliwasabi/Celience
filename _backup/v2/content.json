@@ -1,0 +1,127 @@
+{
+  "user": { "firstName": "Thomas" },
+
+  "clusters": [
+    { "id": "hormonal",  "label": "HORMONAL",  "color": "#EDB0FA", "todo": false, "pos": { "home": [94, 297],  "dashboard": [108, 247], "map": [121, 196] } },
+    { "id": "immunity",  "label": "IMMUNITY",  "color": "#82F2B2", "todo": false, "pos": { "home": [269, 476], "dashboard": [222, 247], "map": [207, 282] } },
+    { "id": "energy",    "label": "ENERGY",    "color": "#EAE559", "todo": false, "pos": { "home": [294, 506], "dashboard": [262, 247], "map": [314, 322] } },
+    { "id": "mind",      "label": "MIND",      "color": "#B4A2F9", "todo": false, "pos": { "home": [43, 794],  "dashboard": [44, 217],  "map": [63, 360] } },
+    { "id": "nutrition", "label": "NUTRITION", "color": "#95DF80", "todo": false, "pos": { "home": [308, 785], "dashboard": [369, 205], "map": [267, 421] } },
+    { "id": "sleep",     "label": "SLEEP",     "color": "#697DDC", "todo": true,  "pos": { "home": [19, 824],  "dashboard": [19, 248],  "map": [121, 555] } },
+    { "id": "skin",      "label": "SKIN",      "color": "#F1A2BA", "todo": false, "pos": { "home": [276, 759], "dashboard": [171, 248], "map": [286, 633] } },
+    { "id": "stress",    "label": "STRESS",    "color": "#EE7E7A", "todo": true,  "pos": { "home": [65, 740],  "dashboard": [371, 244], "map": [82, 697] } }
+  ],
+
+  "loader": {
+    "_comment": "The 8 shapes of the logo (cx, cy, rx, ry in its 38x33 viewBox) and which cluster takes which spot.",
+    "logo": [
+      [24.8795, 3.85459, 3.85458, 3.85458], [33.2895, 9.81166, 3.85458, 4.205],
+      [32.2382, 23.1275, 4.205, 4.205],     [22.076, 28.0335, 3.85458, 4.205],
+      [11.5637, 28.3836, 3.85458, 3.85458], [3.85458, 20.6745, 3.85458, 3.85458],
+      [4.9058, 10.8629, 4.205, 3.85458],    [14.0166, 4.20506, 4.205, 4.205]
+    ],
+    "spotOf": { "hormonal": 5, "immunity": 4, "energy": 3, "mind": 7, "nutrition": 0, "sleep": 2, "skin": 1, "stress": 6 }
+  },
+
+  "quizzes": {
+    "sleep": [
+      { "question": "HOW DO YOU USUALLY\nFALL ASLEEP?", "hint": "Think about the last two weeks.",
+        "options": ["I fall asleep easily", "Sometimes I struggle", "I often struggle", "It varies a lot", "I’d rather not answer"],
+        "_motion": "Circle loop per answer (6 s): awake = seconds it floats [min, max] (at least 1.5 s), then a 1.2 s eased landing, then rests (asleep) for the remaining time. null = the circle stops.",
+        "motion": [
+          { "awake": [1.5, 1.5] },
+          { "awake": [1.5, 2.5] },
+          { "awake": [3.5, 4.0] },
+          { "awake": [1.5, 4.5] },
+          null
+        ] },
+      { "question": "WHEN YOU WAKE UP,\nDO YOU FEEL RESTED?", "hint": "Think about your nights over the last two weeks.",
+        "options": ["Almost always", "Often", "Sometimes", "Rarely", "It really depends", "I’d rather not answer"],
+        "_motion": "Waking up (6 s loop): wake = rests first, then floats for `awake` s at the end of the loop. speed = drift tempo (higher = livelier), soft = how fast it wakes / settles (higher = quicker, still eased), hesitate = 0..1 how much the float falters (half wakes, sinks back). [min, max] = random each loop.",
+        "motion": [
+          { "wake": true, "awake": [4.0, 4.5], "speed": 1.1,  "soft": 3.6, "hesitate": 0 },
+          { "wake": true, "awake": [3.5, 4.0], "speed": 0.85, "soft": 2.8, "hesitate": 0.2 },
+          { "wake": true, "awake": [3.0, 3.5], "speed": 0.65, "soft": 2.1, "hesitate": 0.45 },
+          { "wake": true, "awake": [2.5, 3.0], "speed": 0.42, "soft": 1.5, "hesitate": 0.7 },
+          { "wake": true, "awake": [2.0, 4.5], "speed": [0.42, 1.1], "soft": [1.5, 3.6], "hesitate": [0, 0.7] },
+          null
+        ] }
+    ],
+    "stress": [
+      { "question": "HOW OFTEN DO YOU FEEL\nUNDER PRESSURE?", "hint": "Over the last two weeks.",
+        "options": ["Rarely", "Sometimes", "Often", "Very often", "I’d rather not answer"] },
+      { "question": "AFTER A DEMANDING DAY,\nCAN YOU SWITCH OFF?", "hint": "Think about your daily life over the last two weeks.",
+        "options": ["Very easily", "Fairly easily", "With difficulty", "With great difficulty", "It depends on the day", "I’d rather not answer"] }
+    ]
+  },
+
+  "protocolRules": {
+    "_comment": "Answer indexes that highlight a topic. Any highlighted topic adds Recovery Night to the protocol.",
+    "sleep":  [ { "question": 0, "answers": [1, 2, 3], "topic": "falling asleep" },
+                { "question": 1, "answers": [2, 3, 4], "topic": "how rested you feel in the morning" } ],
+    "stress": [ { "question": 0, "answers": [1, 2, 3], "topic": "perceived pressure" },
+                { "question": 1, "answers": [2, 3, 4], "topic": "switching off after demanding days" } ]
+  },
+
+  "events": {
+    "menu": [
+      { "label": "CONNECT WATCH",  "width": 160 },
+      { "label": "TRAVELLING",     "width": 121, "opens": "travel" },
+      { "label": "SPORT TRAINING", "width": 153 }
+    ],
+    "travel": {
+      "title": "YOUR TRIP",
+      "fields": [
+        { "label": "From", "value": "Zurich (ZRH)" },
+        { "label": "Destination", "value": "Singapour (SIN)" },
+        { "label": "Departure date", "value": "2026-11-17" }
+      ],
+      "summary": {
+        "title": "EVENT ADDED",
+        "trip": { "name": "Travel", "detail": "Zurich (ZRH) → Singapour (SIN) · November 17" },
+        "universes": ["Sleep & Recovery", "Energy & Metabolism", "Nutrition & Digestion"]
+      },
+      "dashboardCard": { "label": "Travelling\nto Singapour", "count": 5, "total": 7 }
+    }
+  },
+
+  "routines": [
+    { "label": "Training for marathon", "count": 24, "total": 84, "color": "#F0B1B0", "countColor": "#DD7272", "product": "recovery",
+      "reason": "Part of your Training for marathon routine, taken each evening to support recovery between sessions." },
+    { "label": "Fighting sickness", "count": 13, "total": 30, "color": "#74E3E0", "countColor": "#4FA9A6", "product": "micro",
+      "reason": "Part of your Fighting sickness routine. Zinc, selenium and vitamin D contribute to the normal function of the immune system." }
+  ],
+  "tripRoutineReason": "Part of your trip to Singapour: before the flight, during the flight and the first nights after arrival.",
+
+  "products": {
+    "recovery": {
+      "name": "Recovery Night", "color": "#D6DDF9",
+      "clusters": ["Sleep onset support", "Sleep quality improvement", "Stress perception reduction", "Nervous system relaxation"],
+      "description": "A formula designed to support the evening routine, with four selected actives playing complementary roles.",
+      "science": "Built around 3 g of glycine, the amount explored in several small studies before bedtime, with encouraging results on some subjective sleep and next-day fatigue measures. L-theanine (200 mg), magnesium (120 mg) and lemon balm (300 mg) complete the formula. These results don’t guarantee an individual benefit.",
+      "precautions": "Don’t exceed the indicated serving. Other supplements containing magnesium are taken into account in your protocol. If you take medication, are pregnant or have persistent sleep problems, ask a professional."
+    },
+    "flight": {
+      "name": "Flight Reset", "color": "#E9EAF9",
+      "clusters": ["Jet lag adaptation", "Travel fatigue reduction", "Hydration recovery"],
+      "description": "A three-step nutritional protocol for long-haul travel: before the flight, during the flight and the first nights after arrival.",
+      "science": "Pre-flight: L-theanine, magnesium and B6. In flight: electrolytes with supporting ingredients. Post-flight: Prosomnial®, a pistachio extract naturally containing melatonin. The overall effectiveness of this protocol against jet lag is not established.",
+      "precautions": "Allergen: pistachio in the post-flight phase. Precautions apply to some serotonergic medications, sedatives and thyroid treatments. The three phases are not meant to be taken together."
+    },
+    "micro": {
+      "name": "Essential Micronutrients", "color": "#9DC596",
+      "clusters": ["Micronutrient sufficiency", "Cofactor support for metabolism"],
+      "description": "A foundation formula bringing together six micronutrients chosen for their complementary physiological roles.",
+      "reason": "Your Nutrition & Digestion profile is complete. This daily base (vitamin D3, K2, magnesium, zinc, selenium, B12) structures your micronutrient coverage, without replacing a varied diet.",
+      "science": "Vitamin D contributes to normal muscle and immune function, B12 to normal energy metabolism, zinc and selenium to the protection of cells against oxidative stress. These are recognised physiological roles, not proof of a personal deficiency.",
+      "precautions": "Vitamin K and anticoagulant treatments: important precaution. Total intake of vitamin D, minerals and other micronutrients must stay consistent with your routine."
+    }
+  },
+
+  "safety": {
+    "title": "YOUR SITUATION",
+    "options": ["I am pregnant or breastfeeding", "I take prescription medication", "I have known food allergies or intolerances", "None of the above"],
+    "confirmIndex": 3,
+    "confirmation": "ORDER CONFIRMED"
+  }
+}

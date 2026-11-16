@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Celience Adapt · Prototype</title>
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- The phone screen. Every screen lives in this one 390 × 844 frame; js/app.js shows one at a time. -->
+  <main class="app" id="app" data-screen="loading">
+
+    <!-- Header: back arrow · logo + title · basket badge -->
+    <header class="header" id="header">
+      <button class="header__back" id="back" type="button" aria-label="Back">
+        <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M9.5 2 L2.5 10 L9.5 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="header__brand" id="brand">
+        <button class="header__logo" id="logo" type="button" aria-label="Home">
+          <img src="assets/logo.svg" width="38" height="33" alt="">
+        </button>
+        <span class="header__title" id="title">MAP</span>
+      </div>
+      <button class="header__badge" id="badge" type="button" aria-label="Basket">
+        <span id="badgeCount">0</span>
+      </button>
+    </header>
+
+    <!-- Screen 1 + dashboard greeting -->
+    <h1 class="hello" id="hello"><span class="hello__hi">Hello,</span><span class="hello__name" id="helloName">Thomas</span></h1>
+
+    <!-- Dashboard panel: also a solid floor for the dots -->
+    <section class="panel" id="panel" aria-label="Your active protocol">
+      <div class="panel__protocol">Your active protocol</div>
+      <div class="panel__routines" id="routines"></div>
+      <button class="routine routine--wide" id="tripCard" type="button"></button>
+    </section>
+
+    <!-- The 8 coloured dots (built from data/content.json) -->
+    <div class="dots" id="dots"></div>
+
+    <!-- Map actions -->
+    <div class="map-actions" id="mapActions">
+      <button class="svg-button" id="accessProtocol" type="button" aria-label="Access my protocol">
+        <img src="assets/button-access-my-protocol.svg" width="196" height="40" alt="">
+      </button>
+      <button class="svg-button svg-button--light" id="addEvent" type="button" aria-label="Add an event" aria-expanded="false">
+        <img src="assets/button-add-an-event.svg" width="139" height="40" alt="">
+      </button>
+    </div>
+    <div class="event-menu" id="eventMenu"></div>
+
+    <!-- Cluster quiz (Sleep, Stress) -->
+    <!-- layout: progress + question on top, the cluster's circle in the middle,
+         answers + Next button at the bottom -->
+    <section class="screen screen--quiz" id="quiz" aria-live="polite">
+      <div class="progress" id="quizProgress"></div>
+      <div class="quiz__body stack" id="quizBody">
+        <div class="card card--question" id="quizQuestion">
+          <p class="card__question" id="quizQuestionText"></p>
+          <p class="card__hint" id="quizHint"></p>
+        </div>
+        <div class="quiz__orb" aria-hidden="true"><span class="quiz__orb-dot" id="quizOrb"></span></div>
+        <div class="quiz__options" id="quizOptions" role="radiogroup"></div>
+      </div>
+      <button class="outline-button quiz__next" id="quizNext" type="button" disabled>Next</button>
+    </section>
+
+    <!-- Travelling event: trip details → 2 questions → summary -->
+    <section class="screen screen--centered" id="travel" aria-live="polite">
+      <div class="progress" id="travelProgress"></div>
+      <div class="stack" id="travelBody"></div>
+    </section>
+
+    <!-- Protocol (recommendations) and single product -->
+    <section class="screen screen--list" id="protocol">
+      <div class="stack" id="protocolList"></div>
+    </section>
+    <button class="outline-button outline-button--bottom" id="addToBasket" type="button">ADD TO BASKET</button>
+
+    <!-- Basket -->
+    <section class="screen screen--list" id="basket">
+      <div class="stack" id="basketList"></div>
+    </section>
+    <button class="outline-button outline-button--bottom" id="buy" type="button">BUY</button>
+
+    <!-- Safety check before ordering -->
+    <section class="screen screen--centered" id="safety">
+      <div class="progress"><span class="progress__segment is-done"></span></div>
+      <div class="stack">
+        <div class="card card--question"><p class="card__question" id="safetyTitle"></p></div>
+        <div class="card card--options" id="safetyOptions"></div>
+      </div>
+    </section>
+
+    <!-- Order confirmed -->
+    <section class="screen screen--centered" id="order">
+      <div class="card card--question"><p class="card__question" id="orderText"></p></div>
+    </section>
+
+    <p class="load-error" id="loadError" hidden>
+      Open this folder with a local server so the prototype can read <code>data/content.json</code>.<br>
+      For example: <code>npx serve</code>, or “Live Server” in VS Code.
+    </p>
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

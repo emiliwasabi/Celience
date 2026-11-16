@@ -32,9 +32,7 @@
 
     <!-- Dashboard panel: also a solid floor for the dots -->
     <section class="panel" id="panel" aria-label="Your active protocol">
-      <div class="panel__protocol">Your active protocol</div>
       <div class="panel__routines" id="routines"></div>
-      <button class="routine routine--wide" id="tripCard" type="button"></button>
     </section>
 
     <!-- The 8 coloured dots (built from data/content.json) -->
@@ -66,6 +64,9 @@
       </div>
       <button class="outline-button quiz__next" id="quizNext" type="button" disabled>Next</button>
     </section>
+
+    <!-- Cluster detail (a filled dot on the map): my data in the middle, related content around it -->
+    <section class="cluster-view" id="clusterView" aria-live="polite"></section>
 
     <!-- Travelling event: trip details → 2 questions → summary -->
     <section class="screen screen--centered" id="travel" aria-live="polite">

@@ -16,8 +16,8 @@
   const R = 20;                                   // dot radius
 
   // where the greeting and the dashboard panel sit for each layout
-  const HELLO_TOP = { home: 384, dashboard: 128, map: 60 };
-  const PANEL_TOP = { home: 860, dashboard: 268, map: 860 };
+  const HELLO_TOP = { home: 384, dashboard: 216, map: 60 };
+  const PANEL_TOP = { home: 860, dashboard: 470, map: 860 };
 
   // the Add an event menu unfolds upwards from the button row
   const MENU_TOP = 780;
@@ -87,13 +87,15 @@
     screen: 'loading',
     quiz: null, qi: 0, answers: {},               // current cluster quiz
     results: {}, done: {},                        // finished quizzes
-    travelStep: 0, travelAnswers: {}, travelDone: false, tripAnswers: {},
+    travelStep: 0, travelDone: false,
     menuOpen: false,
     basket: [], inBasket: false,
     safety: {},
     openRows: {},
     product: null
   };
+
+  let tripPie = null;
 
   const sim = {
     now: 0,
@@ -129,6 +131,7 @@
 
     if (screen === 'home') { enterAll(0.1); return; }
     if (screen === 'dashboard') {
+      pies.forEach((p) => { if (p !== tripPie || sim.tripSeen) emptyPie(p, PIE.delay); });
       // gravity: the dots fall onto the rising panel and settle side by side, all flat on it.
       // Each one gets a slot on the panel, in the left-to-right order they already have.
       const order = sim.dots.map((_, i) => i).sort((a, b) => sim.dots[a].x - sim.dots[b].x);
@@ -162,6 +165,7 @@
       case 'product': goTo('dashboard'); break;
       case 'map': goTo('dashboard'); break;
       case 'quiz': clearTimeout(timer); leaveQuiz(state.quiz, null); break;
+      case 'cluster': clearTimeout(timer); leaveCluster(state.cluster); break;
       default: clearTimeout(timer); show('map');
     }
   }
@@ -247,6 +251,70 @@
     }, QUIZ_STAGE.outBefore);
   }
 
+  /* ------------------------------------------------------------------------
+     Cluster detail: tap a filled dot → it flies to the centre and becomes
+     "MY DATA", the related content appears around it
+     ---------------------------------------------------------------------- */
+
+  // positions in the 390 × 844 frame (MY DATA = screen centre)
+  const CLUSTER_SPOTS = [[84, 331], [269, 301], [103, 537], [276, 589]];
+
+  function canOpenCluster(id) {
+    const cl = clusterById(id);
+    return !cl.todo || !!state.done[id];
+  }
+
+  function buildCluster(id) {
+    const cl = clusterById(id);
+    const d = (C.clusterDetail && C.clusterDetail[id]) || {};
+    const view = $('clusterView');
+    view.textContent = '';
+    const node = (label, x, y, cls, k) => {
+      const n = el('div', 'cnode ' + cls);
+      n.style.left = x + 'px';
+      n.style.top = y + 'px';
+      n.style.setProperty('--o', k);
+      n.append(el('span', 'cnode__label', label), el('span', 'cnode__circle'));
+      view.appendChild(n);
+    };
+    node(C.clusterLabels.myData, W / 2, H / 2, 'cnode--mine', 0);
+    view.style.setProperty('--c', cl.color);
+    // the related topic takes the top-right spot, articles the others (as on the reference)
+    const order = [C.clusterLabels.articles, d.related || C.clusterLabels.articles, C.clusterLabels.articles, C.clusterLabels.articles];
+    CLUSTER_SPOTS.forEach(([x, y], k) => node(order[k], x, y, '', k + 1));
+  }
+
+  function openCluster(id) {
+    clearTimeout(timer);
+    buildCluster(id);
+    show('cluster', { cluster: id, menuOpen: false });
+    const i = quizDot(id);
+    const node = dotNodes[i];
+    const view = $('clusterView');
+    view.classList.remove('is-revealed');
+    node.classList.add('is-traveling');
+    flyDot(i, screenCentre());
+    later(QUIZ_FLY * 1000, () => {
+      if (state.screen !== 'cluster' || state.cluster !== id) return;
+      view.classList.add('is-revealed');            // MY DATA sits exactly where the dot landed
+      setTimeout(() => node.classList.remove('is-traveling'), 300);
+    });
+  }
+
+  function leaveCluster(id) {
+    const i = quizDot(id);
+    const node = dotNodes[i];
+    const p = sim.dots[i];
+    [p.x, p.y] = screenCentre();
+    node.classList.add('is-traveling');
+    $('clusterView').classList.remove('is-revealed');
+    later(350, () => {
+      show('map');
+      flyDot(i, null);
+      setTimeout(() => node.classList.remove('is-traveling'), QUIZ_FLY * 1000);
+    });
+  }
+
   // success: the outline fills from the centre, the dot pops and sends out a ripple
   function celebrate(i, id) {
     const node = dotNodes[i];
@@ -287,26 +355,19 @@
      ---------------------------------------------------------------------- */
 
   function openTravel() {
-    show('travel', { menuOpen: false, travelStep: 0, travelAnswers: {} });
+    show('travel', { menuOpen: false, travelStep: 0 });
   }
 
   function travelNext() {
     fadeTo($('travelBody'), () => {
       state.travelStep += 1;
       renderTravel();
-      if (state.travelStep === 3) {
+      if (state.travelStep === 1) {
         // summary: 2 s to read, then back to the map
         state.travelDone = true;
-        state.tripAnswers = state.travelAnswers;
         later(2000, () => show('map'));
       }
     });
-  }
-
-  function pickTravel(k) {
-    state.travelAnswers = Object.assign({}, state.travelAnswers, { [state.travelStep]: k });
-    renderTravel();
-    later(450, travelNext);
   }
 
   /* ------------------------------------------------------------------------
@@ -335,12 +396,8 @@
     }
 
     if (state.travelDone) {
-      const pick = state.tripAnswers[1];
-      const options = C.events.travel.questions[0].options;
-      const priority = pick !== undefined ? options[pick].toLowerCase() : 'your travel';
       cards.push(Object.assign({ id: 'flight' }, C.products.flight, {
-        reason: 'You declared a trip Zurich (ZRH) → Singapour (SIN) on November 17 and want to prioritize ' +
-                priority + '. Flight Reset organises the key moments of your journey.'
+        reason: 'You declared a trip Zurich (ZRH) → Singapour (SIN) on November 17. Flight Reset organises the key moments of your journey.'
       }));
     }
 
@@ -815,7 +872,10 @@
 
     // the travelling card arrives the first time the panel settles after the event was added
     if (state.travelDone && state.screen === 'dashboard' && !sim.panel.tw) sim.tripSeen = true;
-    $('tripCard').classList.toggle('is-shown', state.travelDone && sim.tripSeen);
+    const tripCard = $('tripCard');
+    const shown = state.travelDone && sim.tripSeen;
+    if (shown && !tripCard.classList.contains('is-shown')) emptyPie(tripPie, 0.4);
+    tripCard.classList.toggle('is-shown', shown);
   }
 
   function loop() {
@@ -842,7 +902,9 @@
 
     // header: title + logo kept optically centred
     const layout = layoutOf(state.screen);
-    const title = state.screen === 'quiz' ? clusterById(state.quiz).label : SCREEN_TITLE[state.screen] || '';
+    const title = state.screen === 'quiz' ? clusterById(state.quiz).label
+                : state.screen === 'cluster' ? clusterById(state.cluster).label
+                : SCREEN_TITLE[state.screen] || '';
     $('title').textContent = title;
     $('brand').style.left = (layout === 'map' ? Math.round(W / 2 - (48 + title.length * 10) / 2) : 176) + 'px';
     $('badgeCount').textContent = state.basket.length;
@@ -926,7 +988,7 @@
     const t = C.events.travel;
     const step = state.travelStep;
     const body = $('travelBody');
-    progress($('travelProgress'), 3, Math.min(step, 2), 'var(--violet-strong)', 'var(--track)');
+    progress($('travelProgress'), 2, Math.min(step, 1), 'var(--violet-strong)', 'var(--track)');
     body.textContent = '';
 
     if (step === 0) {
@@ -942,12 +1004,6 @@
       cont.type = 'button';
       cont.addEventListener('click', travelNext);
       body.appendChild(cont);
-    } else if (step <= 2) {
-      const q = t.questions[step - 1];
-      body.appendChild(questionCard(q.question));
-      const list = el('div', 'card card--options');
-      options(list, q.options, state.travelAnswers[step], pickTravel);
-      body.appendChild(list);
     } else {
       body.appendChild(questionCard(t.summary.title));
       const summary = el('div', 'card card--summary');
@@ -965,6 +1021,50 @@
     return card;
   }
 
+  // remaining time as a pie (camembert): the coloured slice is what is left of the routine.
+  // It empties clockwise from full down to its value each time the dashboard appears.
+  const PIE = { dur: 1.4, delay: 0.5 };
+  const pies = [];
+
+  function timePie(left, total, color) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 36 36');
+    svg.setAttribute('class', 'routine__pie');
+    svg.setAttribute('aria-hidden', 'true');
+    const track = document.createElementNS(NS, 'circle');
+    track.setAttribute('cx', 18); track.setAttribute('cy', 18); track.setAttribute('r', 18);
+    track.setAttribute('class', 'routine__pie-track');
+    const slice = document.createElementNS(NS, 'path');
+    slice.style.fill = color;
+    svg.append(track, slice);
+    const pie = { slice: slice, value: clamp(left / total, 0, 1) };
+    drawPie(pie, pie.value);
+    pies.push(pie);
+    return { svg: svg, pie: pie };
+  }
+
+  function drawPie(pie, f) {
+    if (f >= 0.999) { pie.slice.setAttribute('d', 'M18 0 A18 18 0 1 1 17.99 0 Z'); return; }
+    if (f <= 0) { pie.slice.setAttribute('d', ''); return; }
+    const a = f * 2 * Math.PI;
+    const x = 18 + 18 * Math.sin(a), y = 18 - 18 * Math.cos(a);
+    pie.slice.setAttribute('d', 'M18 18 L18 0 A18 18 0 ' + (f > 0.5 ? 1 : 0) + ' 1 ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' Z');
+  }
+
+  function emptyPie(pie, delay) {
+    const t0 = performance.now() + delay * 1000;
+    pie.run = t0;
+    drawPie(pie, 1);
+    const step = (t) => {
+      if (pie.run !== t0) return;                  // a newer animation took over
+      const k = clamp((t - t0) / (PIE.dur * 1000), 0, 1);
+      drawPie(pie, 1 - (1 - pie.value) * easeOut(k));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   function renderProducts() {
     const list = $('protocolList');
     const cards = state.screen === 'product' ? [state.product] : buildProtocol();
@@ -974,7 +1074,7 @@
       const card = el('article', 'product');
       card.style.setProperty('--card', c.color);
       card.append(el('h2', 'product__name', c.name), el('p', 'product__text', c.description));
-      if (c.reason) card.appendChild(el('p', 'product__text', c.reason));
+      if (c.reason && state.screen === 'product') card.appendChild(el('p', 'product__text', c.reason));
 
       const rows = el('div', 'product__rows');
       [['science', 'What the science says', c.science], ['precautions', 'Precautions', c.precautions]].forEach(([key, label, text]) => {
@@ -1041,7 +1141,11 @@
       b.style.setProperty('--c', cl.color);
       b.style.setProperty('--label-delay', 350 + i * 40 + 'ms');
       b.append(el('span', 'dot__circle'), el('span', 'dot__label', cl.label));
-      if (C.quizzes[cl.id]) b.addEventListener('click', () => openQuiz(cl.id));
+      b.addEventListener('click', () => {
+        if (state.screen !== 'map') return;
+        if (canOpenCluster(cl.id)) openCluster(cl.id);
+        else if (C.quizzes[cl.id]) openQuiz(cl.id);
+      });
       dots.appendChild(b);
       dotNodes.push(b);
     });
@@ -1055,16 +1159,21 @@
       b.type = 'button';
       b.style.setProperty('--card', r.color);
       b.style.setProperty('--count', r.countColor);
-      b.appendChild(el('span', 'routine__count', String(r.count)));
+      b.appendChild(timePie(r.count, r.total, r.countColor).svg);
       b.addEventListener('click', () => openRoutine(r.product, r.reason));
       routines.appendChild(b);
     });
-    const trip = $('tripCard');
+    // the trip card fills the last free slot (bottom right) once the trip is added
+    const trip = el('button', 'routine routine--trip');
+    trip.type = 'button';
+    trip.id = 'tripCard';
+    routines.appendChild(trip);
     const tc = C.events.travel.dashboardCard;
     trip.textContent = tc.label;
     trip.style.setProperty('--card', '#FEFDCC');
-    trip.style.setProperty('--count', '#D2D2A8');
-    trip.appendChild(el('span', 'routine__count', String(tc.count)));
+    const tp = timePie(tc.count, tc.total, '#B5B57A');
+    trip.appendChild(tp.svg);
+    tripPie = tp.pie;
     trip.addEventListener('click', () => openRoutine('flight', C.tripRoutineReason));
 
     // add an event menu

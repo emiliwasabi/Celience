@@ -76,27 +76,34 @@
         { "label": "Destination", "value": "Singapour (SIN)" },
         { "label": "Departure date", "value": "2026-11-17" }
       ],
-      "questions": [
-        { "question": "WHAT WOULD YOU LIKE\nTO PRIORITIZE?",
-          "options": ["Sleep and schedule adaptation", "Comfort during the flight", "Energy after arrival"] },
-        { "question": "WHAT BOTHERS YOU MOST\nON LONG-HAUL FLIGHTS?",
-          "options": ["Falling asleep at local time", "Fatigue after arrival", "Digestive comfort during the trip", "Keeping up my routine", "I don’t know yet"] }
-      ],
       "summary": {
         "title": "EVENT ADDED",
         "trip": { "name": "Travel", "detail": "Zurich (ZRH) → Singapour (SIN) · November 17" },
         "universes": ["Sleep & Recovery", "Energy & Metabolism", "Nutrition & Digestion"]
       },
-      "dashboardCard": { "label": "Travelling\nto Singapour", "count": 5 }
+      "dashboardCard": { "label": "Travelling\nto Singapour", "count": 5, "total": 7 }
     }
   },
 
   "routines": [
-    { "label": "Training for marathon", "count": 24, "color": "#F0B1B0", "countColor": "#DD7272", "product": "recovery",
+    { "label": "Training for marathon", "count": 24, "total": 84, "color": "#F0B1B0", "countColor": "#DD7272", "product": "recovery",
       "reason": "Part of your Training for marathon routine, taken each evening to support recovery between sessions." },
-    { "label": "Fighting sickness", "count": 13, "color": "#74E3E0", "countColor": "#4FA9A6", "product": "micro",
+    { "label": "Curing skin issues", "count": 18, "total": 42, "color": "#F0C6FB", "countColor": "#C98AD8", "product": "skin",
+      "reason": "Part of your Curing skin issues routine. Zinc, biotin and vitamin A contribute to the maintenance of normal skin." },
+    { "label": "Fighting sickness", "count": 13, "total": 30, "color": "#74E3E0", "countColor": "#4FA9A6", "product": "micro",
       "reason": "Part of your Fighting sickness routine. Zinc, selenium and vitamin D contribute to the normal function of the immune system." }
   ],
+  "clusterLabels": { "myData": "MY DATA", "articles": "ARTICLES" },
+  "clusterDetail": {
+    "hormonal":  { "related": "CYCLE & MOOD" },
+    "immunity":  { "related": "SEASONAL DEFENCES" },
+    "energy":    { "related": "SLEEP & BIOLOGICAL RHYTHM" },
+    "mind":      { "related": "FOCUS & MEMORY" },
+    "nutrition": { "related": "DIGESTIVE COMFORT" },
+    "sleep":     { "related": "STRESS & RECOVERY" },
+    "skin":      { "related": "HYDRATION & BARRIER" },
+    "stress":    { "related": "SLEEP & SWITCHING OFF" }
+  },
   "tripRoutineReason": "Part of your trip to Singapour: before the flight, during the flight and the first nights after arrival.",
 
   "products": {
@@ -113,6 +120,12 @@
       "description": "A three-step nutritional protocol for long-haul travel: before the flight, during the flight and the first nights after arrival.",
       "science": "Pre-flight: L-theanine, magnesium and B6. In flight: electrolytes with supporting ingredients. Post-flight: Prosomnial®, a pistachio extract naturally containing melatonin. The overall effectiveness of this protocol against jet lag is not established.",
       "precautions": "Allergen: pistachio in the post-flight phase. Precautions apply to some serotonergic medications, sedatives and thyroid treatments. The three phases are not meant to be taken together."
+    },
+    "skin": {
+      "name": "Skin Balance", "color": "#F0C6FB",
+      "description": "A daily formula built around zinc, biotin and vitamin A, nutrients that contribute to the maintenance of normal skin.",
+      "science": "Zinc, biotin and vitamin A contribute to the maintenance of normal skin. Results depend on diet, routine and individual factors.",
+      "precautions": "Do not exceed the recommended daily dose. Vitamin A: ask a professional before use during pregnancy."
     },
     "micro": {
       "name": "Essential Micronutrients", "color": "#9DC596",
