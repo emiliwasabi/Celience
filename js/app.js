@@ -185,10 +185,25 @@
     return [q.offsetLeft + d.offsetLeft + d.offsetWidth / 2, q.offsetTop + d.offsetTop + d.offsetHeight / 2];
   }
 
+  // to = fixed point, or a function giving a moving target (followed every frame)
   function flyDot(i, to, dur) {
     const p = sim.dots[i];
+    const follow = typeof to === 'function' ? to : null;
+    const pt = follow ? follow() : to;
     Object.assign(p, { mode: 'tween', ease: 'soft', fx: p.x, fy: p.y, t0: sim.now, dur: dur || QUIZ_FLY,
-                       hx: to ? to[0] : undefined, hy: to ? to[1] : undefined });
+                       hx: pt ? pt[0] : undefined, hy: pt ? pt[1] : undefined, follow: follow });
+  }
+
+  // where the quiz circle really is (its place + its current float / sway)
+  const orbNow = () => { const [x, y] = orbCenter(); return [x + orb.pos[0], y + orb.pos[1]]; };
+
+  // map dot ↔ quiz circle hand-over in the same frame: no cross-fade, no double, no gap
+  function swap(node, showDot) {
+    node.style.transition = 'none';
+    node.classList.toggle('is-traveling', showDot);
+    $('quiz').classList.toggle('is-orb-hidden', showDot);
+    void node.offsetWidth;                         // apply now, then give the transition back
+    node.style.transition = '';
   }
 
   /* Quiz choreography
@@ -213,11 +228,11 @@
     setTimeout(() => {
       if (!still()) return;
       $('quiz').classList.add('is-revealed');        // 2. the questions appear…
-      flyDot(i, orbCenter(), QUIZ_STAGE.settle);     //    …while the circle settles into its place
+      flyDot(i, orbNow, QUIZ_STAGE.settle);          //    …while the circle settles onto the quiz circle
       setTimeout(() => {
         if (!still()) return;
-        $('quiz').classList.remove('is-orb-hidden'); // 3. hand over to the animated quiz circle
-        node.classList.remove('is-traveling');
+        swap(node, false);                           // 3. hand over to the animated quiz circle
+        sim.dots[i].follow = null;                   //    (the hidden dot stops tracking it)
       }, QUIZ_STAGE.settle * 1000);
     }, QUIZ_FLY * 1000);
   }
@@ -228,10 +243,8 @@
     const p = sim.dots[i];
     $('quiz').classList.remove('is-revealed');      // 1. the questions leave
     setTimeout(() => {
-      const [ox, oy] = orbCenter();
-      p.x = ox + orb.pos[0]; p.y = oy + orb.pos[1];  // the dot takes over exactly where the quiz circle is
-      node.classList.add('is-traveling');
-      $('quiz').classList.add('is-orb-hidden');
+      [p.x, p.y] = orbNow();                         // the dot takes over exactly where the quiz circle is
+      swap(node, true);
       flyDot(i, screenCentre(), QUIZ_STAGE.centre); // 2. back to the centre
       const toMap = () => {                          // 4. the others come back, then it flies home
         show('map', answers ? { results: Object.assign({}, state.results, { [id]: answers }) } : {});
@@ -703,6 +716,7 @@
     const drift = layout === 'map' ? MAP_DRIFT : DRIFT;
 
     sim.dots.forEach((p, i) => {
+      if (p.follow) [p.hx, p.hy] = p.follow();       // moving target (e.g. the quiz circle)
       const target = p.hx !== undefined ? [p.hx, p.hy] : home(i, layout);
 
       if (p.mode === 'load') {
@@ -784,13 +798,21 @@
        wake     true = rests first and floats at the END of the loop (waking up); default = floats first
        speed    drift tempo (higher = livelier)          — number or [min, max] re-rolled every loop
        soft     how quickly it wakes / settles (higher = quicker, still eased) — number or [min, max]
-       hesitate 0..1, the float falters: half wakes, sinks back, picks up again — number or [min, max] */
+       hesitate 0..1, the float falters: half wakes, sinks back, picks up again — number or [min, max]
+     Stress answers use a variable cycle instead of the 6 s loop:
+       calm     [min, max] s resting in the centre, then
+       burst    [min, max] s of quick, nervous movement — both re-rolled every cycle
+       jitter   0..1 extra high-frequency shake during the burst
+       size     0..1 share of the float area used (default 1) */
   // defaults: loop = full cycle (s), minAwake = shortest float (s), amp = float size (px),
   // soft / speed = used when the answer does not set its own
   const ORB = { loop: 6, minAwake: 1.5, amp: 60, soft: 2, speed: 0.45 };
+  // the circle is never perfectly still: a tiny, slow sway is always added on top
+  // (resting, asleep, no answer, "rather not answer"). amp = px, speed = tempo
+  const ORB_IDLE = { amp: 5, speed: 0.35 };
   const orb = { key: null, motion: null, t0: 0, awake: 0, level: 0, lv: 0, prev: null, pos: [0, 0],
-                clock: 0, speed: ORB.speed, soft: ORB.soft,
-                goal: { speed: ORB.speed, soft: ORB.soft, hesitate: 0 },
+                clock: 0, speed: ORB.speed, soft: ORB.soft, jitter: 0, size: 1, calm: 0, burst: 0,
+                goal: { speed: ORB.speed, soft: ORB.soft, hesitate: 0, jitter: 0, size: 1 },
                 ph: [0, 1, 2, 3, 4].map(() => Math.random() * Math.PI * 2) };
 
   const roll = (v, d) => (v === undefined ? d : Array.isArray(v) ? v[0] + Math.random() * (v[1] - v[0]) : v);
@@ -799,7 +821,10 @@
     const m = orb.motion;
     orb.t0 = t0;
     orb.awake = clamp(roll(m.awake, ORB.minAwake), ORB.minAwake, ORB.loop);
-    orb.goal = { speed: roll(m.speed, ORB.speed), soft: roll(m.soft, ORB.soft), hesitate: roll(m.hesitate, 0) };
+    orb.calm = roll(m.calm, 0);
+    orb.burst = roll(m.burst, 0);
+    orb.goal = { speed: roll(m.speed, ORB.speed), soft: roll(m.soft, ORB.soft), hesitate: roll(m.hesitate, 0),
+                 jitter: roll(m.jitter, 0), size: roll(m.size, 1) };
   }
 
   // set from renderQuiz: a new answer / question only changes the targets, the motion carries on
@@ -808,15 +833,19 @@
     orb.key = key;
     orb.motion = motion || null;
     if (orb.motion) orbNewLoop(sim.now);
-    else orb.goal = { speed: orb.goal.speed, soft: ORB.soft, hesitate: 0 };
+    else orb.goal = { speed: orb.goal.speed, soft: ORB.soft, hesitate: 0, jitter: 0, size: orb.goal.size };
   }
 
   // the drift: layered sines on its own clock (advanced by the eased tempo → never jumps)
+  // jitter adds a fast, nervous layer on top (stress)
   function orbDrift(c) {
     const p = orb.ph;
+    const j = orb.jitter;
     return [
-      0.6 * Math.sin(c * 2.1 + p[0]) + 0.4 * Math.sin(c * 3.3 + p[1]),
-      0.6 * Math.sin(c * 1.7 + p[2]) + 0.4 * Math.sin(c * 2.9 + p[3])
+      0.6 * Math.sin(c * 2.1 + p[0]) + 0.4 * Math.sin(c * 3.3 + p[1]) +
+        j * (0.35 * Math.sin(c * 7.3 + p[2]) + 0.25 * Math.sin(c * 11.9 + p[3])),
+      0.6 * Math.sin(c * 1.7 + p[2]) + 0.4 * Math.sin(c * 2.9 + p[3]) +
+        j * (0.35 * Math.sin(c * 8.1 + p[0]) + 0.25 * Math.sin(c * 12.7 + p[1]))
     ];
   }
 
@@ -824,17 +853,23 @@
     const dt = orb.prev === null ? 0 : Math.min(0.05, sim.now - orb.prev);
     orb.prev = sim.now;
 
-    // tempo and softness glide toward this loop's values (no sudden change of pace)
-    const g = Math.min(1, dt * 1.2);
+    // tempo and softness glide toward this loop's values (no sudden change of pace;
+    // quicker for stress answers so the shake can pick up fast — still eased)
+    const stress = !!(orb.motion && orb.motion.calm);
+    const g = Math.min(1, dt * (stress ? 6 : 1.2));
     orb.speed += (orb.goal.speed - orb.speed) * g;
     orb.soft += (orb.goal.soft - orb.soft) * g;
+    orb.jitter += (orb.goal.jitter - orb.jitter) * g;
+    orb.size += (orb.goal.size - orb.size) * g;
     orb.clock += orb.speed * dt;
 
     let target = 0;                                            // asleep / no answer / stop
     if (orb.motion) {
-      while (sim.now - orb.t0 >= ORB.loop) orbNewLoop(orb.t0 + ORB.loop);
+      const cycle = () => (stress ? orb.calm + orb.burst : ORB.loop);
+      while (sim.now - orb.t0 >= cycle()) orbNewLoop(orb.t0 + cycle());
       const t = sim.now - orb.t0;
-      const awake = orb.motion.wake ? t >= ORB.loop - orb.awake : t < orb.awake;
+      const awake = stress ? t >= orb.calm                     // stress: calm, then a burst
+        : orb.motion.wake ? t >= ORB.loop - orb.awake : t < orb.awake;
       if (awake) {
         // hesitation: the wish to float wavers slowly (smoothed by the spring below → no jolts)
         const hz = orb.goal.hesitate;
@@ -848,9 +883,15 @@
     orb.level = clamp(orb.level + orb.lv * dt, 0, 1);
 
     const [dx, dy] = orbDrift(orb.clock);
-    const k = ORB.amp * orb.level;
-    orb.pos = [dx * k, dy * k];
-    $('quizOrb').style.transform = 'translate(' + (dx * k).toFixed(2) + 'px,' + (dy * k).toFixed(2) + 'px)';
+    const k = ORB.amp * orb.size * orb.level;
+    // idle sway: its own slow clock, so it stays calm whatever the answer's tempo
+    const ic = sim.now * ORB_IDLE.speed;
+    const ix = ORB_IDLE.amp * (0.7 * Math.sin(ic * 1.3 + orb.ph[1]) + 0.3 * Math.sin(ic * 2.3 + orb.ph[3]));
+    const iy = ORB_IDLE.amp * (0.7 * Math.sin(ic * 1.1 + orb.ph[0]) + 0.3 * Math.sin(ic * 1.9 + orb.ph[2]));
+    const x = dx * k + ix;
+    const y = dy * k + iy;
+    orb.pos = [x, y];
+    $('quizOrb').style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px)';
   }
 
   function draw() {
@@ -937,12 +978,13 @@
 
   function clusterById(id) { return C.clusters.find((c) => c.id === id); }
 
+  // the segments are kept between renders so a newly reached step can fill in (animated in CSS)
   function progress(node, total, current, color, track) {
-    node.textContent = '';
-    for (let n = 0; n < total; n++) {
-      const seg = el('span', 'progress__segment' + (n <= current ? ' is-done' : ''));
-      node.appendChild(seg);
+    if (node.children.length !== total) {
+      node.textContent = '';
+      for (let n = 0; n < total; n++) node.appendChild(el('span', 'progress__segment'));
     }
+    Array.from(node.children).forEach((seg, n) => seg.classList.toggle('is-done', n <= current));
     node.style.setProperty('--progress-color', color);
     node.style.setProperty('--track-color', track);
   }
@@ -1025,6 +1067,18 @@
   // It empties clockwise from full down to its value each time the dashboard appears.
   const PIE = { dur: 1.4, delay: 0.5 };
   const pies = [];
+
+  // dashboard cards: black time pies, with the days left written next to them (e.g. "24d")
+  const PIE_COLOR = '#000000';
+  const daysLeft = (n) => el('span', 'routine__days', n + 'd');
+  // optional product photo, bottom left, cropped by the card's edges (set "image" in content.json)
+  function productImage(src) {
+    const img = el('img', 'routine__img');
+    img.src = src;
+    img.alt = '';
+    img.onerror = () => img.remove();              // missing file: the card simply has no photo
+    return img;
+  }
 
   function timePie(left, total, color) {
     const NS = 'http://www.w3.org/2000/svg';
@@ -1157,9 +1211,9 @@
     C.routines.forEach((r) => {
       const b = el('button', 'routine', r.label);
       b.type = 'button';
-      b.style.setProperty('--card', r.color);
-      b.style.setProperty('--count', r.countColor);
-      b.appendChild(timePie(r.count, r.total, r.countColor).svg);
+      b.style.setProperty('--card', clusterById(r.cluster).color);   // same colour as its circle
+      if (r.image) b.appendChild(productImage(r.image));
+      b.append(timePie(r.count, r.total, PIE_COLOR).svg, daysLeft(r.count));
       b.addEventListener('click', () => openRoutine(r.product, r.reason));
       routines.appendChild(b);
     });
@@ -1170,9 +1224,10 @@
     routines.appendChild(trip);
     const tc = C.events.travel.dashboardCard;
     trip.textContent = tc.label;
-    trip.style.setProperty('--card', '#FEFDCC');
-    const tp = timePie(tc.count, tc.total, '#B5B57A');
-    trip.appendChild(tp.svg);
+    trip.style.setProperty('--card', clusterById(tc.cluster).color);
+    const tp = timePie(tc.count, tc.total, PIE_COLOR);
+    if (tc.image) trip.appendChild(productImage(tc.image));
+    trip.append(tp.svg, daysLeft(tc.count));
     tripPie = tp.pie;
     trip.addEventListener('click', () => openRoutine('flight', C.tripRoutineReason));
 

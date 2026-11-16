@@ -227,7 +227,8 @@ p, h1, h2 { margin: 0; }
   justify-content: flex-start;
   padding: 16px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--button-radius);   /* 20 px, like the mock-up */
+  overflow: hidden;                      /* crops the product photo */
   background: var(--card, var(--white));
   font-size: 19px;
   line-height: 1.25;
@@ -266,11 +267,31 @@ p, h1, h2 { margin: 0; }
 .routine__pie {
   position: absolute;
   right: 14px;
-  bottom: 14px;
-  width: 52px;
-  height: 52px;
+  bottom: 42px;                   /* stacked above the days: 12 + 19 + 11 gap */
+  width: calc(2 * var(--button-radius));   /* radius = the card's corner radius (20 px) */
+  height: calc(2 * var(--button-radius));
 }
-.routine__pie-track { fill: none; }              /* no background disc: only the slice that is left */
+/* full disc under the slice: the card colour, slightly darker */
+.routine__pie-track { fill: color-mix(in srgb, var(--card) 91%, #000); }
+/* days left, under the pie, bottom right */
+.routine__days {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  font-size: 19px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+/* product photo: bottom left, running off the card's left and bottom edges */
+.routine__img {
+  position: absolute;
+  left: -14%;
+  bottom: -10%;
+  width: 62%;
+  height: auto;
+  pointer-events: none;
+}
 
 /* --------------------------------------------------------------------------
    Dots
@@ -489,10 +510,11 @@ p, h1, h2 { margin: 0; }
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--card);
+  border: var(--stroke) solid var(--card);   /* during the quiz: outline only, it fills once completed */
+  background: transparent;
   will-change: transform;          /* floats / lands / rests, driven by app.js */
 }
-.quiz__orb-dot { transition: opacity 250ms ease; }
+.quiz__orb-dot { transition: none; }   /* swapped with the map dot in the same frame */
 #quiz.is-orb-hidden .quiz__orb-dot { opacity: 0; transition: none; }   /* the flying map dot stands in for it */
 .quiz__options {
   display: flex;
@@ -577,13 +599,28 @@ p, h1, h2 { margin: 0; }
   gap: 4px;
 }
 .progress__segment {
+  position: relative;
   flex: 1;
   height: 4px;
   border-radius: 2px;
+  overflow: hidden;
   background: var(--track-color, var(--track));
-  transition: background 350ms ease;
 }
-.progress__segment.is-done { background: var(--progress-color, var(--violet-strong)); }
+/* the fill grows from the left when a step is reached, and drains back when it is undone */
+.progress__segment::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--progress-color, var(--violet-strong));
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 700ms var(--ease-soft);
+}
+.progress__segment.is-done::after { transform: scaleX(1); }
+/* quiz: the bar fills only once it has appeared (after the circle reached the centre),
+   and empties quickly while the quiz leaves */
+#quiz:not(.is-revealed) .progress__segment::after { transform: scaleX(0); transition-duration: 300ms; }
+#quiz.is-revealed .progress__segment::after { transition-delay: 250ms; }
 
 /* --------------------------------------------------------------------------
    Cards

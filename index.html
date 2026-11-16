@@ -53,16 +53,16 @@
     <!-- layout: progress + question on top, the cluster's circle in the middle,
          answers + Next button at the bottom -->
     <section class="screen screen--quiz" id="quiz" aria-live="polite">
-      <div class="progress" id="quizProgress"></div>
+      <div class="progress q-stage" id="quizProgress"></div>
       <div class="quiz__body stack" id="quizBody">
-        <div class="card card--question" id="quizQuestion">
+        <div class="card card--question q-stage" id="quizQuestion">
           <p class="card__question" id="quizQuestionText"></p>
           <p class="card__hint" id="quizHint"></p>
         </div>
         <div class="quiz__orb" aria-hidden="true"><span class="quiz__orb-dot" id="quizOrb"></span></div>
         <div class="quiz__options" id="quizOptions" role="radiogroup"></div>
       </div>
-      <button class="outline-button quiz__next" id="quizNext" type="button" disabled>Next</button>
+      <button class="outline-button quiz__next q-stage" id="quizNext" type="button" disabled>Next</button>
     </section>
 
     <!-- Cluster detail (a filled dot on the map): my data in the middle, related content around it -->
