@@ -212,7 +212,7 @@ p, h1, h2 { margin: 0; }
   left: var(--margin);
   right: var(--margin);
   top: var(--margin);
-  height: 322px;                  /* 2 rows of 157 + 8 */
+  height: 366px;                  /* fills the panel: 844 − 430 − 2 × 24 */
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -267,10 +267,10 @@ p, h1, h2 { margin: 0; }
   position: absolute;
   right: 14px;
   bottom: 14px;
-  width: 46px;
-  height: 46px;
+  width: 52px;
+  height: 52px;
 }
-.routine__pie-track { fill: rgba(255, 255, 255, .55); }
+.routine__pie-track { fill: none; }              /* no background disc: only the slice that is left */
 
 /* --------------------------------------------------------------------------
    Dots
@@ -403,16 +403,16 @@ p, h1, h2 { margin: 0; }
 
 .event-menu__item {
   position: absolute;
-  left: 227px;                    /* aligned with Add an event */
+  left: 296.5px;                  /* centre of Add an event (227 + 139 / 2); app.js shifts each item by half its width */
   top: 780px;                     /* moved up by app.js when open */
   height: var(--button-h);
-  padding: 0 0 0 17px;
+  padding: 0;
   border: var(--stroke) solid var(--black);
   border-radius: var(--button-radius);
   background: var(--bg);
   font-size: 14px;
   font-weight: 600;
-  text-align: left;
+  text-align: center;
   color: var(--black);
   cursor: pointer;
   opacity: 0;

@@ -16,8 +16,8 @@
   const R = 20;                                   // dot radius
 
   // where the greeting and the dashboard panel sit for each layout
-  const HELLO_TOP = { home: 384, dashboard: 216, map: 60 };
-  const PANEL_TOP = { home: 860, dashboard: 470, map: 860 };
+  const HELLO_TOP = { home: 384, dashboard: 202, map: 60 };
+  const PANEL_TOP = { home: 860, dashboard: 430, map: 860 };
 
   // the Add an event menu unfolds upwards from the button row
   const MENU_TOP = 780;
@@ -1182,6 +1182,7 @@
       const b = el('button', 'event-menu__item', item.label);
       b.type = 'button';
       b.style.width = item.width + 'px';
+      b.style.marginLeft = -item.width / 2 + 'px';     // centred above Add an event
       b.addEventListener('click', () => {
         if (item.opens === 'travel') openTravel();
         else { state.menuOpen = false; render(); }
