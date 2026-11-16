@@ -2,14 +2,14 @@
   "user": { "firstName": "Thomas" },
 
   "clusters": [
-    { "id": "hormonal",  "label": "HORMONAL",  "color": "#7F8CF2", "todo": false, "pos": { "home": [94, 297],  "dashboard": [108, 247], "map": [121, 196] } },
-    { "id": "immunity",  "label": "IMMUNITY",  "color": "#74E3E0", "todo": false, "pos": { "home": [269, 476], "dashboard": [222, 247], "map": [207, 282] } },
-    { "id": "energy",    "label": "ENERGY",    "color": "#FDFDC8", "todo": false, "pos": { "home": [294, 506], "dashboard": [262, 247], "map": [314, 322] } },
-    { "id": "mind",      "label": "MIND",      "color": "#C3AEEE", "todo": false, "pos": { "home": [43, 794],  "dashboard": [44, 217],  "map": [63, 360] } },
-    { "id": "nutrition", "label": "NUTRITION", "color": "#9DC596", "todo": false, "pos": { "home": [308, 785], "dashboard": [369, 205], "map": [267, 421] } },
-    { "id": "sleep",     "label": "SLEEP",     "color": "#D6DDF9", "todo": true,  "pos": { "home": [19, 824],  "dashboard": [19, 248],  "map": [121, 555] } },
-    { "id": "skin",      "label": "SKIN",      "color": "#F0C8F7", "todo": false, "pos": { "home": [276, 759], "dashboard": [171, 248], "map": [286, 633] } },
-    { "id": "stress",    "label": "STRESS",    "color": "#DD7272", "todo": true,  "pos": { "home": [65, 740],  "dashboard": [371, 244], "map": [82, 697] } }
+    { "id": "hormonal",  "label": "HORMONAL",  "color": "#EDB0FA", "todo": false, "pos": { "home": [94, 297],  "dashboard": [108, 247], "map": [121, 196] } },
+    { "id": "immunity",  "label": "IMMUNITY",  "color": "#82F2B2", "todo": false, "pos": { "home": [269, 476], "dashboard": [222, 247], "map": [207, 282] } },
+    { "id": "energy",    "label": "ENERGY",    "color": "#EAE559", "todo": false, "pos": { "home": [294, 506], "dashboard": [262, 247], "map": [314, 322] } },
+    { "id": "mind",      "label": "MIND",      "color": "#B4A2F9", "todo": false, "pos": { "home": [43, 794],  "dashboard": [44, 217],  "map": [63, 360] } },
+    { "id": "nutrition", "label": "NUTRITION", "color": "#95DF80", "todo": false, "pos": { "home": [308, 785], "dashboard": [369, 205], "map": [267, 421] } },
+    { "id": "sleep",     "label": "SLEEP",     "color": "#697DDC", "todo": true,  "pos": { "home": [19, 824],  "dashboard": [19, 248],  "map": [121, 555] } },
+    { "id": "skin",      "label": "SKIN",      "color": "#F1A2BA", "todo": false, "pos": { "home": [276, 759], "dashboard": [171, 248], "map": [286, 633] } },
+    { "id": "stress",    "label": "STRESS",    "color": "#EE7E7A", "todo": true,  "pos": { "home": [65, 740],  "dashboard": [371, 244], "map": [82, 697] } }
   ],
 
   "loader": {
@@ -26,9 +26,26 @@
   "quizzes": {
     "sleep": [
       { "question": "HOW DO YOU USUALLY\nFALL ASLEEP?", "hint": "Think about the last two weeks.",
-        "options": ["I fall asleep easily", "Sometimes I struggle", "I often struggle", "It varies a lot", "I’d rather not answer"] },
+        "options": ["I fall asleep easily", "Sometimes I struggle", "I often struggle", "It varies a lot", "I’d rather not answer"],
+        "_motion": "Circle loop per answer (6 s): awake = seconds it floats [min, max] (at least 1.5 s), then a 1.2 s eased landing, then rests (asleep) for the remaining time. null = the circle stops.",
+        "motion": [
+          { "awake": [1.5, 1.5] },
+          { "awake": [1.5, 2.5] },
+          { "awake": [3.5, 4.0] },
+          { "awake": [1.5, 4.5] },
+          null
+        ] },
       { "question": "WHEN YOU WAKE UP,\nDO YOU FEEL RESTED?", "hint": "Think about your nights over the last two weeks.",
-        "options": ["Almost always", "Often", "Sometimes", "Rarely", "It really depends", "I’d rather not answer"] }
+        "options": ["Almost always", "Often", "Sometimes", "Rarely", "It really depends", "I’d rather not answer"],
+        "_motion": "Waking up (6 s loop): wake = rests first, then floats for `awake` s at the end of the loop. speed = drift tempo (higher = livelier), soft = how fast it wakes / settles (higher = quicker, still eased), hesitate = 0..1 how much the float falters (half wakes, sinks back). [min, max] = random each loop.",
+        "motion": [
+          { "wake": true, "awake": [4.0, 4.5], "speed": 1.1,  "soft": 3.6, "hesitate": 0 },
+          { "wake": true, "awake": [3.5, 4.0], "speed": 0.85, "soft": 2.8, "hesitate": 0.2 },
+          { "wake": true, "awake": [3.0, 3.5], "speed": 0.65, "soft": 2.1, "hesitate": 0.45 },
+          { "wake": true, "awake": [2.5, 3.0], "speed": 0.42, "soft": 1.5, "hesitate": 0.7 },
+          { "wake": true, "awake": [2.0, 4.5], "speed": [0.42, 1.1], "soft": [1.5, 3.6], "hesitate": [0, 0.7] },
+          null
+        ] }
     ],
     "stress": [
       { "question": "HOW OFTEN DO YOU FEEL\nUNDER PRESSURE?", "hint": "Over the last two weeks.",

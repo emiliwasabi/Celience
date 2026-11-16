@@ -14,7 +14,7 @@
     <!-- Header: back arrow · logo + title · basket badge -->
     <header class="header" id="header">
       <button class="header__back" id="back" type="button" aria-label="Back">
-        <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M9.5 2 L2.5 10 L9.5 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="12" height="20" viewBox="0 0 12 20" aria-hidden="true"><path d="M9.5 2 L2.5 10 L9.5 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="header__brand" id="brand">
         <button class="header__logo" id="logo" type="button" aria-label="Home">
@@ -52,15 +52,19 @@
     <div class="event-menu" id="eventMenu"></div>
 
     <!-- Cluster quiz (Sleep, Stress) -->
-    <section class="screen screen--centered" id="quiz" aria-live="polite">
+    <!-- layout: progress + question on top, the cluster's circle in the middle,
+         answers + Next button at the bottom -->
+    <section class="screen screen--quiz" id="quiz" aria-live="polite">
       <div class="progress" id="quizProgress"></div>
-      <div class="stack" id="quizBody">
+      <div class="quiz__body stack" id="quizBody">
         <div class="card card--question" id="quizQuestion">
           <p class="card__question" id="quizQuestionText"></p>
           <p class="card__hint" id="quizHint"></p>
         </div>
-        <div class="card card--options" id="quizOptions"></div>
+        <div class="quiz__orb" aria-hidden="true"><span class="quiz__orb-dot" id="quizOrb"></span></div>
+        <div class="quiz__options" id="quizOptions" role="radiogroup"></div>
       </div>
+      <button class="outline-button quiz__next" id="quizNext" type="button" disabled>Next</button>
     </section>
 
     <!-- Travelling event: trip details → 2 questions → summary -->

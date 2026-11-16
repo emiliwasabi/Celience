@@ -26,12 +26,14 @@
   --header-h: 40px;
   --content-top: 92px;        /* header bottom */
   --radius: 4px;
-  --button-radius: 5px;
+  --button-radius: 20px;          /* all buttons (the SVG buttons draw the same 20px corners) */
+  --stroke: 1.5px;                /* ONE border width for everything: buttons, navigation, circles (SVG buttons + back arrow use 1.5 too) */
   --button-h: 40px;
 
   /* motion */
   --ease: cubic-bezier(.6, 0, .2, 1);
   --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-soft: cubic-bezier(.76, 0, .24, 1);   /* quart in-out = easeSoft in app.js (dots spread) */
 
   font-family: "Inter", system-ui, sans-serif;
   color: var(--ink);
@@ -187,6 +189,8 @@ p, h1, h2 { margin: 0; }
 }
 .hello__name { font-weight: 600; }
 .app.is-intro-done:is([data-screen="home"], [data-screen="dashboard"]) .hello { opacity: 1; }
+/* back on the profile (e.g. from the map): let the panel and the dots settle first, then fade the greeting in slowly */
+.app.is-intro-done[data-screen="dashboard"] .hello { transition: opacity 800ms var(--ease-soft) 900ms; }
 
 /* --------------------------------------------------------------------------
    Dashboard panel
@@ -286,8 +290,10 @@ p, h1, h2 { margin: 0; }
   pointer-events: none;
   transition: opacity 450ms ease;
 }
-.app:is([data-screen="quiz"], [data-screen="travel"], [data-screen="protocol"], [data-screen="product"],
+.app:is([data-screen="travel"], [data-screen="protocol"], [data-screen="product"],
         [data-screen="basket"], [data-screen="safety"], [data-screen="order"]) .dots { opacity: 0; }
+/* quiz: only the quiz's own dot stays visible while it flies to / from the quiz circle */
+.app[data-screen="quiz"] .dot:not(.is-traveling) { opacity: 0; }
 
 .dot {
   position: absolute;
@@ -300,6 +306,7 @@ p, h1, h2 { margin: 0; }
   background: transparent;
   pointer-events: none;
   will-change: transform;          /* position set every frame by app.js */
+  transition: opacity 450ms ease;
 }
 .app[data-screen="map"] .dot.is-quiz { pointer-events: auto; cursor: pointer; }
 
@@ -308,11 +315,48 @@ p, h1, h2 { margin: 0; }
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 2px solid var(--c);
+  position: relative;
+  border: var(--stroke) solid var(--c);
   background: var(--c);
-  transition: background 700ms ease 400ms;
+  transition: background 700ms ease 400ms, border-color 700ms ease;
 }
-.dot.is-todo .dot__circle { background: transparent; }   /* outline = quiz not answered yet */
+
+/* quiz completed: the outline fills from the centre, the dot pops, a ripple goes out */
+.dot__circle::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--stroke));
+  border-radius: 50%;
+  background: var(--c);
+  transform: scale(0);
+  pointer-events: none;
+}
+.dot.is-success .dot__circle { transition: none; animation: dot-pop 900ms var(--ease-soft); }
+.dot.is-success .dot__circle::before { animation: dot-fill 650ms var(--ease-soft) forwards; }
+.dot.is-success::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: var(--stroke) solid var(--c);
+  pointer-events: none;
+  animation: dot-ripple 1100ms var(--ease-out) forwards;
+}
+@keyframes dot-fill { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes dot-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.22); }
+  72% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+@keyframes dot-ripple {
+  from { transform: scale(1); opacity: 0.9; }
+  to { transform: scale(2.6); opacity: 0; }
+}
+/* black until the dot lands on screen 1, then it fades into its colour */
+.dot:not(.is-lit) .dot__circle { background: var(--black); border-color: var(--black); }
+.dot.is-lit .dot__circle { transition: background 700ms var(--ease-soft), border-color 700ms var(--ease-soft); }
+.dot.is-todo.is-lit .dot__circle { background: transparent; }   /* outline = quiz not answered yet (revealed with the colour) */
 
 .dot__label {
   position: absolute;
@@ -369,7 +413,7 @@ p, h1, h2 { margin: 0; }
   top: 780px;                     /* moved up by app.js when open */
   height: var(--button-h);
   padding: 0 0 0 17px;
-  border: 1px solid var(--black);
+  border: var(--stroke) solid var(--black);
   border-radius: var(--button-radius);
   background: var(--bg);
   font-size: 14px;
@@ -406,6 +450,99 @@ p, h1, h2 { margin: 0; }
   justify-content: center;
   transform: translateY(24px);
 }
+
+/* quiz: progress + question on top, circle in the middle, answers + Next at the bottom */
+.screen--quiz {
+  left: var(--margin);
+  right: var(--margin);
+  top: var(--content-top);
+  bottom: var(--margin);
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* quiz choreography: each piece rises in once the circle is in the centre (top → bottom, --i)
+   and leaves in reverse (bottom → top, --o). Colour changes are never delayed. */
+.screen--quiz .q-stage {
+  opacity: 0;
+  transform: translateY(14px);
+  transition-property: opacity, transform, background, color;
+  transition-duration: 340ms, 380ms, 300ms, 300ms;
+  transition-timing-function: var(--ease-soft);
+  transition-delay: calc(var(--o, 0) * 30ms), calc(var(--o, 0) * 30ms), 0ms, 0ms;
+}
+#quiz.is-revealed .q-stage {
+  opacity: 1;
+  transform: none;
+  transition-duration: 560ms, 640ms, 300ms, 300ms;
+  transition-delay: calc(var(--i, 0) * 80ms), calc(var(--i, 0) * 80ms), 0ms, 0ms;
+}
+.stack.quiz__body {
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+.quiz__orb {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.quiz__orb-dot {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  will-change: transform;          /* floats / lands / rests, driven by app.js */
+}
+.quiz__orb-dot { transition: opacity 250ms ease; }
+#quiz.is-orb-hidden .quiz__orb-dot { opacity: 0; transition: none; }   /* the flying map dot stands in for it */
+.quiz__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.quiz__options .option {
+  min-height: 50px;
+  padding: 6px 16px 6px 14px;
+  border-radius: var(--button-radius);
+  background: var(--card);
+}
+.quiz__options .option__dot {
+  width: 20px;
+  height: 20px;
+  border: var(--stroke) dashed var(--ink);
+  background: transparent;
+  transition: background 250ms var(--ease-soft), border-color 250ms ease;
+}
+/* selected = its circle fills in black; the answer buttons themselves never change colour */
+.quiz__options .option.is-selected .option__dot { background: var(--ink); border-style: solid; }
+.quiz__options .option.is-selected .option__text { font-weight: inherit; }
+.quiz__options .option__text { font-size: 14px; }
+
+/* Next: black pill, bottom right */
+.quiz__next {
+  flex: none;
+  align-self: flex-end;
+  margin-top: 16px;
+  height: 38px;
+  padding: 0 22px;
+  border: var(--stroke) solid var(--black);
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--black);
+  transition: background 300ms var(--ease-soft), color 300ms var(--ease-soft);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* outline until an answer is picked, then black with white text */
+.quiz__next:not(:disabled) { background: var(--black); color: var(--white); }
+.quiz__next:disabled { cursor: default; }
 
 /* scrolling lists */
 .screen--list {
@@ -502,7 +639,7 @@ p, h1, h2 { margin: 0; }
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1.5px solid var(--ink);
+  border: var(--stroke) solid var(--ink);
   background: var(--ink);
   transition: background 200ms ease;
 }
@@ -572,7 +709,7 @@ p, h1, h2 { margin: 0; }
 .product__text + .product__text { margin-top: var(--gap); }
 .product__rows { margin-top: 16px; }
 
-.accordion { border-top: 1px solid var(--ink); }
+.accordion { border-top: var(--stroke) solid var(--ink); }
 .accordion__toggle {
   width: 100%;
   min-height: 48px;
@@ -592,7 +729,7 @@ p, h1, h2 { margin: 0; }
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1.5px solid var(--ink);
+  border: var(--stroke) solid var(--ink);
   background: var(--ink);
   transition: background 200ms ease;
 }
@@ -612,7 +749,7 @@ p, h1, h2 { margin: 0; }
 .outline-button {
   height: var(--button-h);
   padding: 0 28px;
-  border: 1px solid var(--black);
+  border: var(--stroke) solid var(--black);
   border-radius: var(--button-radius);
   background: var(--bg);
   color: var(--black);

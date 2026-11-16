@@ -27,8 +27,26 @@
   const DRIFT = { force: 9, spring: 0.5, max: 16 };
   const MAP_DRIFT = { force: 3, spring: 0.9, max: 5 };
 
+  // dashboard (profile): dots fall onto the panel and line up flat on it
+  // g = gravity (px/s²), slide = pull toward its slot, friction = sideways damping,
+  // rest = below this speed (px/s) a dot on the panel stops bouncing, margin = row side margin,
+  // hop = upward kick (px/s) when the bar touches a dot → small bounce (~15 px, then ~5 px)
+  const GRAVITY = { g: 1600, slide: 18, friction: 6, rest: 60, margin: 22, hop: 220 };
+
   // loader: pile ↔ logo, then the dots spread to screen 1
-  const LOADER = { scale: 5, cycle: 1.8, end: 2.9 };
+  // cycle = one full breath (ring → cluster → ring); twist = minimum swirl per dot (rad)
+  // loops = how many times the breath plays (logo → mix → logo); every breath ends on the original logo
+  // duration = length of ONE breath incl. stagger + hold (s); hold = pause on the logo before the spread
+  const LOADER = { scale: 5, duration: 2, stagger: 0.03, twist: 0.6, loops: 2, hold: 0.3 };
+  LOADER.cycle = LOADER.duration - LOADER.hold - 7 * LOADER.stagger;
+  // intro: before the breath, the dots fly in from outside the screen and settle into the logo
+  // intro = seconds until the logo is assembled; introFar = start distance from centre (px);
+  // introWander = how far (px) each dot floats off its straight path, like a firefly
+  LOADER.introOn = false;                 // TEMP: firefly intro disabled — set to true to bring it back
+  LOADER.intro = LOADER.introOn ? 1.2 : 0;
+  LOADER.introFar = 560;
+  LOADER.introWander = 45;
+  LOADER.end = LOADER.intro + LOADER.loops * LOADER.cycle + 7 * LOADER.stagger + LOADER.hold;
   const ENTER_DELAY = [0, 0.18, 0.3, 0.12, 0.42, 0.24, 0.36, 0.06];
 
   const SCREEN_TITLE = {
@@ -42,7 +60,8 @@
 
   const $ = (id) => document.getElementById(id);
   const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+  const easeSoft = (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2);   // quart in-out: longer, softer start and landing
+  const easeOut = (t) => 1 - Math.pow(1 - t, 4);
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const joinAnd = (a) => (a.length < 2 ? a[0] || '' : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 
@@ -82,6 +101,7 @@
     spreadAt: null,
     hello: { v: HELLO_TOP.home, tw: null },
     panel: { v: PANEL_TOP.home, tw: null },
+    bump: { o: 0, v: 0 },            // panel recoil when dots land on it (px offset + speed)
     dots: [],
     clumps: {},
     tripSeen: false
@@ -109,8 +129,19 @@
 
     if (screen === 'home') { enterAll(0.1); return; }
     if (screen === 'dashboard') {
-      // the dots stay put and get pushed up by the rising panel
-      sim.dots.forEach((p) => { p.mode = 'free'; p.vx = 0; p.vy = 0; });
+      // gravity: the dots fall onto the rising panel and settle side by side, all flat on it.
+      // Each one gets a slot on the panel, in the left-to-right order they already have.
+      const order = sim.dots.map((_, i) => i).sort((a, b) => sim.dots[a].x - sim.dots[b].x);
+      const n = sim.dots.length;
+      const x0 = GRAVITY.margin + R;
+      const step = (W - 2 * x0) / (n - 1);
+      order.forEach((i, rank) => {
+        const p = sim.dots[i];
+        p.mode = 'grav';
+        p.onBar = false;
+        p.sx = x0 + rank * step;
+        p.vx *= 0.3; p.vy = Math.min(p.vy, 0) * 0.3;
+      });
       return;
     }
     sim.dots.forEach((p, i) => {
@@ -130,6 +161,7 @@
       case 'safety': show('basket'); break;
       case 'product': goTo('dashboard'); break;
       case 'map': goTo('dashboard'); break;
+      case 'quiz': clearTimeout(timer); leaveQuiz(state.quiz, null); break;
       default: clearTimeout(timer); show('map');
     }
   }
@@ -138,27 +170,110 @@
      Cluster quizzes
      ---------------------------------------------------------------------- */
 
+  // the map dot and the quiz circle are the same circle: it flies in, and flies back out
+  const QUIZ_FLY = 0.9;                              // seconds, map ↔ quiz circle
+  const quizDot = (id) => C.clusters.findIndex((c) => c.id === id);
+
+  // centre of the quiz circle in app coordinates (layout only, ignores the screen's slide-in)
+  function orbCenter() {
+    const q = $('quiz');
+    const d = $('quizOrb');
+    return [q.offsetLeft + d.offsetLeft + d.offsetWidth / 2, q.offsetTop + d.offsetTop + d.offsetHeight / 2];
+  }
+
+  function flyDot(i, to, dur) {
+    const p = sim.dots[i];
+    Object.assign(p, { mode: 'tween', ease: 'soft', fx: p.x, fy: p.y, t0: sim.now, dur: dur || QUIZ_FLY,
+                       hx: to ? to[0] : undefined, hy: to ? to[1] : undefined });
+  }
+
+  /* Quiz choreography
+     IN : the circle flies alone to the centre of the screen → the questions appear one by one
+          (top → bottom) while the circle glides to its place between them → the quiz circle takes over.
+     OUT: the questions leave (bottom → top) → the circle glides back to the centre →
+          completed: it fills with its colour there (fill, pop, ripple) → the other dots come back →
+          it flies home. Back without finishing: same, without the colour. */
+  const QUIZ_STAGE = { settle: 0.6, outBefore: 380, centre: 0.5, colourHold: 1000, homeAfter: 250 };
+  const screenCentre = () => [W / 2, H / 2];
+
   function openQuiz(id) {
     clearTimeout(timer);
     show('quiz', { quiz: id, qi: 0, answers: {}, menuOpen: false });
+    const i = quizDot(id);
+    const node = dotNodes[i];
+    const still = () => state.screen === 'quiz' && state.quiz === id;
+    $('quiz').classList.remove('is-revealed');
+    $('quiz').classList.add('is-orb-hidden');
+    node.classList.add('is-traveling');              // stays visible over the quiz while it moves
+    flyDot(i, screenCentre());                       // 1. alone, to the centre
+    setTimeout(() => {
+      if (!still()) return;
+      $('quiz').classList.add('is-revealed');        // 2. the questions appear…
+      flyDot(i, orbCenter(), QUIZ_STAGE.settle);     //    …while the circle settles into its place
+      setTimeout(() => {
+        if (!still()) return;
+        $('quiz').classList.remove('is-orb-hidden'); // 3. hand over to the animated quiz circle
+        node.classList.remove('is-traveling');
+      }, QUIZ_STAGE.settle * 1000);
+    }, QUIZ_FLY * 1000);
   }
 
+  function leaveQuiz(id, answers) {
+    const i = quizDot(id);
+    const node = dotNodes[i];
+    const p = sim.dots[i];
+    $('quiz').classList.remove('is-revealed');      // 1. the questions leave
+    setTimeout(() => {
+      const [ox, oy] = orbCenter();
+      p.x = ox + orb.pos[0]; p.y = oy + orb.pos[1];  // the dot takes over exactly where the quiz circle is
+      node.classList.add('is-traveling');
+      $('quiz').classList.add('is-orb-hidden');
+      flyDot(i, screenCentre(), QUIZ_STAGE.centre); // 2. back to the centre
+      const toMap = () => {                          // 4. the others come back, then it flies home
+        show('map', answers ? { results: Object.assign({}, state.results, { [id]: answers }) } : {});
+        setTimeout(() => {
+          flyDot(i, null);
+          setTimeout(() => node.classList.remove('is-traveling'), QUIZ_FLY * 1000);
+        }, QUIZ_STAGE.homeAfter);
+      };
+      setTimeout(() => {
+        if (answers) {                               // 3. completed: its colour comes in, in the centre
+          celebrate(i, id);
+          setTimeout(toMap, QUIZ_STAGE.colourHold);
+        } else {
+          toMap();
+        }
+      }, QUIZ_STAGE.centre * 1000);
+    }, QUIZ_STAGE.outBefore);
+  }
+
+  // success: the outline fills from the centre, the dot pops and sends out a ripple
+  function celebrate(i, id) {
+    const node = dotNodes[i];
+    node.classList.add('is-success');
+    setTimeout(() => { state.done = Object.assign({}, state.done, { [id]: true }); render(); }, 650);
+    setTimeout(() => node.classList.remove('is-success'), 1150);
+  }
+
+  // choosing an answer only selects it (it can still be changed); Next moves on
   function pickAnswer(k) {
+    state.answers = Object.assign({}, state.answers, { [state.qi]: k });
+    renderQuiz();
+  }
+
+  function nextQuestion() {
     const quiz = C.quizzes[state.quiz];
     const qi = state.qi;
-    const answers = Object.assign({}, state.answers, { [qi]: k });
-    state.answers = answers;
-    renderQuiz();
+    const answers = state.answers;
+    if (answers[qi] === undefined) return;
+    $('quizNext').disabled = true;            // no double taps during the transition
 
     if (qi < quiz.length - 1) {
-      later(450, () => fadeTo($('quizBody'), () => { state.qi = qi + 1; renderQuiz(); }));
+      fadeTo($('quizBody'), () => { state.qi = qi + 1; renderQuiz(); });
     } else {
       // last answer: the cluster is done (its dot fills) and we return to the map
       const id = state.quiz;
-      later(600, () => show('map', {
-        done: Object.assign({}, state.done, { [id]: true }),
-        results: Object.assign({}, state.results, { [id]: answers })
-      }));
+      later(250, () => leaveQuiz(id, answers));
     }
   }
 
@@ -280,32 +395,137 @@
 
   function home(i, layout) { return C.clusters[i].pos[layout]; }
 
-  // loader: a pile in the centre that bursts into the logo and gathers again
+  // screen 1: scatter the dots at random (new layout on every page load).
+  // They stay inside the screen, below the header, never overlap,
+  // and keep clear of the "Hello, name" text in the middle.
+  const SCATTER = { gap: 14, top: 120, bottom: 20, side: 16, hello: { x0: 70, x1: 320, y0: 360, y1: 470 } };
+  function scatterHome() {
+    const minD = 2 * R + SCATTER.gap;
+    const placed = [];
+    C.clusters.forEach((cl) => {
+      let p;
+      for (let tries = 0; tries < 2000; tries++) {
+        p = [
+          SCATTER.side + R + Math.random() * (W - 2 * (SCATTER.side + R)),
+          SCATTER.top + R + Math.random() * (H - SCATTER.top - SCATTER.bottom - 2 * R)
+        ];
+        const h = SCATTER.hello;
+        const onText = p[0] > h.x0 - R && p[0] < h.x1 + R && p[1] > h.y0 - R && p[1] < h.y1 + R;
+        if (!onText && placed.every((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) >= minD)) break;
+      }
+      placed.push(p);
+      cl.pos.home = p;
+    });
+  }
+
+  // loader: the logo ring breathes in — the dots spiral into a loose, overlapping
+  // cluster that drifts a little — then unfurls back into the ring.
+  // Each cycle gets its own random cluster shape (swapped while on the ring, so no jump)
+  // and its own seating: perm[i] = the ring spot dot i starts that cycle from.
+  // Every new cycle reshuffles the seating, so the dots come out mixed.
   function clump(c) {
     if (!sim.clumps[c]) {
-      sim.clumps[c] = C.loader.logo.map(() => {
-        const a = Math.random() * Math.PI * 2;
-        const r = 4 + Math.random() * 20;
-        return [W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r];
-      });
+      // every breath starts and ends on the original logo (the dots mix inside the cluster)
+      const perm = C.clusters.map((cl) => C.loader.spotOf[cl.id]);
+      const d = Math.random() * Math.PI * 2;
+      sim.clumps[c] = {
+        perm,
+        drift: [Math.cos(d) * R * 0.7, Math.sin(d) * R * 0.7],   // where the whole cluster wanders
+        dots: C.loader.logo.map(() => ({
+          r: 0.28 + (Math.random() - 0.5) * 0.25,                // radius as a share of the ring radius
+          a: (Math.random() - 0.5) * 0.9,                          // angular jitter (rad)
+          ph: Math.random() * Math.PI * 2
+        }))
+      };
     }
     return sim.clumps[c];
   }
 
-  function loaderPos(i) {
-    const spot = C.loader.spotOf[C.clusters[i].id];
+  // a ring spot in polar coordinates around the screen centre
+  function ringPolar(spot) {
     const g = C.loader.logo[spot];
-    const ring = [W / 2 + (g[0] - 19) * LOADER.scale, H / 2 + (g[1] - 16.5) * LOADER.scale];
-    const t = Math.max(0, sim.now - spot * 0.025);
+    const rx = (g[0] - 19) * LOADER.scale;
+    const ry = (g[1] - 16.5) * LOADER.scale;
+    return [Math.sqrt(rx * rx + ry * ry), Math.atan2(ry, rx)];
+  }
+
+  // intro: dot i drifts in from off-screen like a firefly — no spinning, just a soft,
+  // wandering float (layered slow sines) that calms down as it lands on its seat,
+  // exactly when its breath begins (staggered departures, eased arrival = no hard stop)
+  function introPos(i) {
+    if (!sim.fly) sim.fly = [];
+    if (!sim.fly[i]) {
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      sim.fly[i] = {
+        off: rnd(-0.8, 0.8),                                  // start a bit to the side of the seat direction
+        f1: rnd(1.6, 2.6), f2: rnd(3.2, 4.6), f3: rnd(0.9, 1.4),
+        p1: rnd(0, 6.28), p2: rnd(0, 6.28), p3: rnd(0, 6.28)
+      };
+    }
+    const fl = sim.fly[i];
+    const arrive = LOADER.intro + i * LOADER.stagger;
+    const leave = ENTER_DELAY[i] * 0.8;
+    const k = clamp((sim.now - leave) / (arrive - leave), 0, 1);
+    const e = 1 - Math.pow(1 - k, 3);                          // gentle entrance, soft landing
+
+    const [rS, aS] = ringPolar(clump(0).perm[i]);
+    const seat = [W / 2 + Math.cos(aS) * rS, H / 2 + Math.sin(aS) * rS];
+    const a0 = aS + fl.off;
+    const start = [W / 2 + Math.cos(a0) * LOADER.introFar, H / 2 + Math.sin(a0) * LOADER.introFar];
+
+    // straight base path + firefly wander, sideways and a little along the path
+    const bx = start[0] + (seat[0] - start[0]) * e;
+    const by = start[1] + (seat[1] - start[1]) * e;
+    const dx = seat[0] - start[0];
+    const dy = seat[1] - start[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const t = sim.now;
+    const side = Math.sin(t * fl.f1 + fl.p1) * 0.65 + Math.sin(t * fl.f2 + fl.p2) * 0.35;
+    const along = Math.sin(t * fl.f3 + fl.p3) * 0.4;
+    const fade = Math.pow(1 - e, 1.5) * LOADER.introWander;   // calms to 0 on arrival
+    return [
+      bx + (nx * side + (dx / len) * along) * fade,
+      by + (ny * side + (dy / len) * along) * fade
+    ];
+  }
+
+  function loaderPos(i) {
+    if (LOADER.introOn && sim.now < LOADER.intro + i * LOADER.stagger) return introPos(i);
+    // after the last breath the dot rests on its seat (the logo holds)
+    const t = clamp(sim.now - LOADER.intro - i * LOADER.stagger, 0, LOADER.loops * LOADER.cycle - 1e-6);
     const c = Math.floor(t / LOADER.cycle);
-    const u = t - c * LOADER.cycle;
-    const a = clump(c)[spot];
-    const b = clump(c + 1)[spot];
-    let e;
-    if (u < 0.65) { e = ease(u / 0.65); return [a[0] + (ring[0] - a[0]) * e, a[1] + (ring[1] - a[1]) * e]; }
-    if (u < 1.15) return ring;
-    e = ease((u - 1.15) / 0.65);
-    return [ring[0] + (b[0] - ring[0]) * e, ring[1] + (b[1] - ring[1]) * e];
+    const u = (t - c * LOADER.cycle) / LOADER.cycle;
+    const k = clump(c);
+    const cd = k.dots[i];
+
+    // leave from this cycle's seat, land on next cycle's seat
+    const [rA, aA] = ringPolar(k.perm[i]);
+    const [rB, aB] = ringPolar(clump(c + 1).perm[i]);
+    // every dot swirls the SAME way (never backwards), turns at least `twist` rad,
+    // and lands exactly on its next seat → no jump between cycles
+    const TAU = Math.PI * 2;
+    let dA = ((aB - aA) % TAU + TAU) % TAU;
+    if (dA < LOADER.twist) dA += TAU;
+
+    // ONE continuous gesture: the swirl never stops — slowest on the ring,
+    // fastest while the dots pass through the centre. The centre is not a keyframe.
+    // angular progress (Hermite): ~0.4 on the ring between breaths, fastest at the centre,
+    // but it starts from rest on the first breath and settles to rest on the last one
+    const v0 = c === 0 ? 0 : 0.4;
+    const v1 = c === LOADER.loops - 1 ? 0 : 0.4;
+    const s = v0 * (u * u * u - 2 * u * u + u) + (3 * u * u - 2 * u * u * u) + v1 * (u * u * u - u * u);
+    const m = 0.5 - 0.5 * Math.cos(TAU * u);             // how gathered, smooth across cycles (no bounce)
+
+    const ringR = rA + (rB - rA) * (u * u * (3 - 2 * u));
+    const r = ringR * (1 - (1 - cd.r) * m);
+    const a = aA + dA * s + (cd.a + 0.35 * Math.sin(TAU * u + cd.ph)) * m;
+
+    return [
+      W / 2 + Math.cos(a) * r + k.drift[0] * m * m,
+      H / 2 + Math.sin(a) * r + k.drift[1] * m * m
+    ];
   }
 
   // loader done: the same dots spread out to their screen-1 spots
@@ -313,7 +533,7 @@
     sim.spreadAt = sim.now;
     show('home');
     sim.dots.forEach((p, i) => {
-      Object.assign(p, { mode: 'tween', ease: 'inout', fx: p.x, fy: p.y, t0: sim.now + i * 0.04, dur: 1.2 });
+      Object.assign(p, { mode: 'tween', ease: 'soft', fx: p.x, fy: p.y, t0: sim.now + i * 0.04, dur: 1.5 });
     });
   }
 
@@ -332,15 +552,42 @@
     });
   }
 
-  // walls, and on the dashboard the panel is a solid floor
+  // heading turns smoothly (layered slow sines) so paths curve in soft loops
+  function steer(p, dt) {
+    if (p.ph === undefined) p.ph = Math.random() * 100;
+    const t = sim.now;
+    p.th += (0.9 * Math.sin(t * 0.31 + p.ph) + 0.6 * Math.sin(t * 0.53 + p.ph * 1.7)) * dt;
+  }
+
+  // ease speed back under the cap instead of clipping it
+  function softCap(p, max, dt) {
+    const s = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    if (s <= max) return;
+    const k = 1 - (1 - max / s) * Math.min(1, 4 * dt);
+    p.vx *= k; p.vy *= k;
+  }
+
+  // the panel gives a little under each dot that lands on it, then springs back (slight overshoot)
+  // kick = dip speed per landing (px/s), k = spring stiffness, damp = damping, max = deepest dip (px)
+  const PANEL_BUMP = { kick: 120, k: 420, damp: 16, max: 8 };
+  function panelTop() { return sim.panel.v + sim.bump.o; }
+  function bumpPanel(strength) { sim.bump.v += PANEL_BUMP.kick * strength; }
+  function stepBump(dt) {
+    const b = sim.bump;
+    b.v += (-PANEL_BUMP.k * b.o - PANEL_BUMP.damp * b.v) * dt;
+    b.o = clamp(b.o + b.v * dt, -PANEL_BUMP.max, PANEL_BUMP.max);
+  }
+
+  // walls, and on the dashboard the panel is a solid floor (soft bounces)
+  const BOUNCE = 0.6;
   function collide(p) {
-    if (p.x < R) { p.x = R; if (p.vx < 0) p.vx = -p.vx; }
-    if (p.x > W - R) { p.x = W - R; if (p.vx > 0) p.vx = -p.vx; }
-    if (p.y < R) { p.y = R; if (p.vy < 0) p.vy = -p.vy; }
-    if (p.y > H - R) { p.y = H - R; if (p.vy > 0) p.vy = -p.vy; }
-    if (state.screen === 'dashboard' && p.y + R > sim.panel.v) {
-      p.y = sim.panel.v - R;
-      if (p.vy > 0) p.vy = -p.vy;
+    if (p.x < R) { p.x = R; if (p.vx < 0) p.vx = -p.vx * BOUNCE; }
+    if (p.x > W - R) { p.x = W - R; if (p.vx > 0) p.vx = -p.vx * BOUNCE; }
+    if (p.y < R) { p.y = R; if (p.vy < 0) p.vy = -p.vy * BOUNCE; }
+    if (p.y > H - R) { p.y = H - R; if (p.vy > 0) p.vy = -p.vy * BOUNCE; }
+    if (state.screen === 'dashboard' && p.y + R > panelTop()) {
+      p.y = panelTop() - R;
+      if (p.vy > 0) p.vy = -p.vy * BOUNCE;
     }
   }
 
@@ -368,7 +615,7 @@
           const wb = bm ? (am ? 0.5 : 1) : 0;
           a.x -= nx * over * wa; a.y -= ny * over * wa;
           b.x += nx * over * wb; b.y += ny * over * wb;
-          const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;   // equal-mass bounce
+          const rel = 0.8 * ((b.vx - a.vx) * nx + (b.vy - a.vy) * ny);   // soft equal-mass bounce
           if (rel < 0) {
             if (am) { a.vx += rel * nx; a.vy += rel * ny; }
             if (bm) { b.vx -= rel * nx; b.vy -= rel * ny; }
@@ -388,10 +635,12 @@
     stepTween(sim.hello);
     const panelWasMoving = !!sim.panel.tw;
     stepTween(sim.panel);
+    stepBump(dt);
 
     // panel settled on the dashboard: the dots keep drifting where it left them
+    // (dots under gravity stay resting on the panel)
     if (layout === 'dashboard' && panelWasMoving && !sim.panel.tw) {
-      sim.dots.forEach((p) => { p.mode = 'drift'; p.hx = p.x; p.hy = p.y; });
+      sim.dots.forEach((p) => { if (p.mode !== 'grav') { p.mode = 'drift'; p.hx = p.x; p.hy = p.y; } });
     }
 
     const drift = layout === 'map' ? MAP_DRIFT : DRIFT;
@@ -402,26 +651,58 @@
       if (p.mode === 'load') {
         const lp = loaderPos(i);
         p.x = lp[0]; p.y = lp[1];
+      } else if (p.mode === 'grav') {
+        // fall, bounce softly on the panel, and slide sideways into the slot → one flat row
+        p.vx += (p.sx - p.x) * GRAVITY.slide * dt;
+        p.vx *= 1 - GRAVITY.friction * dt;
+        p.x += p.vx * dt;
+        const floor = panelTop() - R;
+        if (!p.onBar) {
+          // falling freely until the bar reaches it (or it lands on the bar)
+          p.vy += GRAVITY.g * dt;
+          p.y += p.vy * dt;
+          if (p.y >= floor) {
+            // contact: a small hop measured from the bar (not thrown by the bar's speed)
+            p.onBar = true;
+            p.h = 0;
+            p.hv = GRAVITY.hop * (0.75 + Math.random() * 0.5);
+            bumpPanel(1);                            // the panel gives under the impact
+          }
+        } else {
+          // height above the bar: hop, fall back, bounce smaller, rest — riding the bar
+          p.h = Math.max(0, floor - p.y);          // picks up any nudge from neighbours
+          p.hv -= GRAVITY.g * dt;
+          p.h += p.hv * dt;
+          if (p.h <= 0) {
+            p.h = 0;
+            if (p.hv < -GRAVITY.rest) bumpPanel(-p.hv / GRAVITY.hop * 0.6);   // smaller landings, smaller dips
+            p.hv = -p.hv * BOUNCE;
+            if (p.hv < GRAVITY.rest) p.hv = 0;      // at rest: no micro-bounce
+          }
+          p.y = floor - p.h;
+          p.vy = 0;
+        }
+        collide(p);
       } else if (p.mode === 'free') {
         // float in place while the panel pushes them
-        p.th += (Math.random() - 0.5) * 3 * dt;
+        steer(p, dt);
         p.vx = p.vx * (1 - 2 * dt) + Math.cos(p.th) * DRIFT.force * dt;
         p.vy = p.vy * (1 - 2 * dt) + Math.sin(p.th) * DRIFT.force * dt;
         p.x += p.vx * dt; p.y += p.vy * dt;
         collide(p);
       } else if (p.mode === 'tween') {
         const k = clamp((sim.now - p.t0) / p.dur, 0, 1);
-        const e = p.ease === 'out' ? easeOut(k) : ease(k);
+        const e = p.ease === 'out' ? easeOut(k) : p.ease === 'soft' ? easeSoft(k) : ease(k);
         p.x = p.fx + (target[0] - p.fx) * e;
         p.y = p.fy + (target[1] - p.fy) * e;
         if (k >= 1) { p.mode = 'drift'; p.vx = 0; p.vy = 0; }
       } else {
         // slow, never-still drift around the home spot
-        p.th += (Math.random() - 0.5) * 3 * dt;
+        steer(p, dt);
         p.vx += (Math.cos(p.th) * drift.force + (target[0] - p.x) * drift.spring) * dt;
         p.vy += (Math.sin(p.th) * drift.force + (target[1] - p.y) * drift.spring) * dt;
-        const s = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-        if (s > drift.max) { p.vx *= drift.max / s; p.vy *= drift.max / s; }
+        p.vx *= 1 - 0.4 * dt; p.vy *= 1 - 0.4 * dt;   // light damping: no sudden pulls
+        softCap(p, drift.max, dt);
         p.x += p.vx * dt; p.y += p.vy * dt;
         collide(p);
       }
@@ -436,15 +717,100 @@
 
   const dotNodes = [];
 
+  /* Quiz circle: mirrors the chosen answer as a 6 s loop — awake (floats) ↔ asleep (rests in the centre).
+     The float itself never restarts: it is one continuous drift whose size is scaled by an
+     "awake level" (0 = resting in the centre, 1 = full float). That level always glides toward its
+     target through a soft critically-damped spring, and the drift tempo / softness also ease between
+     answers — so falling asleep, waking up, changing the answer or the question never snap.
+     Per answer ("motion" in content.json, null = the circle settles and stays still):
+       awake    [min, max] s of floating per loop (at least minAwake)
+       wake     true = rests first and floats at the END of the loop (waking up); default = floats first
+       speed    drift tempo (higher = livelier)          — number or [min, max] re-rolled every loop
+       soft     how quickly it wakes / settles (higher = quicker, still eased) — number or [min, max]
+       hesitate 0..1, the float falters: half wakes, sinks back, picks up again — number or [min, max] */
+  // defaults: loop = full cycle (s), minAwake = shortest float (s), amp = float size (px),
+  // soft / speed = used when the answer does not set its own
+  const ORB = { loop: 6, minAwake: 1.5, amp: 60, soft: 2, speed: 0.45 };
+  const orb = { key: null, motion: null, t0: 0, awake: 0, level: 0, lv: 0, prev: null, pos: [0, 0],
+                clock: 0, speed: ORB.speed, soft: ORB.soft,
+                goal: { speed: ORB.speed, soft: ORB.soft, hesitate: 0 },
+                ph: [0, 1, 2, 3, 4].map(() => Math.random() * Math.PI * 2) };
+
+  const roll = (v, d) => (v === undefined ? d : Array.isArray(v) ? v[0] + Math.random() * (v[1] - v[0]) : v);
+
+  function orbNewLoop(t0) {
+    const m = orb.motion;
+    orb.t0 = t0;
+    orb.awake = clamp(roll(m.awake, ORB.minAwake), ORB.minAwake, ORB.loop);
+    orb.goal = { speed: roll(m.speed, ORB.speed), soft: roll(m.soft, ORB.soft), hesitate: roll(m.hesitate, 0) };
+  }
+
+  // set from renderQuiz: a new answer / question only changes the targets, the motion carries on
+  function orbFor(motion, key) {
+    if (key === orb.key) return;
+    orb.key = key;
+    orb.motion = motion || null;
+    if (orb.motion) orbNewLoop(sim.now);
+    else orb.goal = { speed: orb.goal.speed, soft: ORB.soft, hesitate: 0 };
+  }
+
+  // the drift: layered sines on its own clock (advanced by the eased tempo → never jumps)
+  function orbDrift(c) {
+    const p = orb.ph;
+    return [
+      0.6 * Math.sin(c * 2.1 + p[0]) + 0.4 * Math.sin(c * 3.3 + p[1]),
+      0.6 * Math.sin(c * 1.7 + p[2]) + 0.4 * Math.sin(c * 2.9 + p[3])
+    ];
+  }
+
+  function drawOrb() {
+    const dt = orb.prev === null ? 0 : Math.min(0.05, sim.now - orb.prev);
+    orb.prev = sim.now;
+
+    // tempo and softness glide toward this loop's values (no sudden change of pace)
+    const g = Math.min(1, dt * 1.2);
+    orb.speed += (orb.goal.speed - orb.speed) * g;
+    orb.soft += (orb.goal.soft - orb.soft) * g;
+    orb.clock += orb.speed * dt;
+
+    let target = 0;                                            // asleep / no answer / stop
+    if (orb.motion) {
+      while (sim.now - orb.t0 >= ORB.loop) orbNewLoop(orb.t0 + ORB.loop);
+      const t = sim.now - orb.t0;
+      const awake = orb.motion.wake ? t >= ORB.loop - orb.awake : t < orb.awake;
+      if (awake) {
+        // hesitation: the wish to float wavers slowly (smoothed by the spring below → no jolts)
+        const hz = orb.goal.hesitate;
+        const waver = 0.5 + 0.5 * Math.sin(sim.now * 1.4 + orb.ph[4]);
+        target = 1 - hz * 0.75 * waver;
+      }
+    }
+    // critically-damped spring: starts gently, arrives gently, no overshoot
+    const w = orb.soft;
+    orb.lv += (w * w * (target - orb.level) - 2 * w * orb.lv) * dt;
+    orb.level = clamp(orb.level + orb.lv * dt, 0, 1);
+
+    const [dx, dy] = orbDrift(orb.clock);
+    const k = ORB.amp * orb.level;
+    orb.pos = [dx * k, dy * k];
+    $('quizOrb').style.transform = 'translate(' + (dx * k).toFixed(2) + 'px,' + (dy * k).toFixed(2) + 'px)';
+  }
+
   function draw() {
+    if (state.screen === 'quiz') drawOrb();
     sim.dots.forEach((p, i) => {
       dotNodes[i].style.transform = 'translate(' + (p.x - R).toFixed(2) + 'px,' + (p.y - R).toFixed(2) + 'px)';
+      // colour comes in right after the loader ends, as the dots start to spread
+      if (!p.lit && sim.loaded) {
+        p.lit = true;
+        dotNodes[i].classList.add('is-lit');
+      }
     });
     $('hello').style.top = sim.hello.v.toFixed(2) + 'px';
-    $('panel').style.top = sim.panel.v.toFixed(2) + 'px';
+    $('panel').style.top = panelTop().toFixed(2) + 'px';
 
     // text and header appear once the dots have finished spreading
-    const introDone = sim.loaded && sim.spreadAt !== null && sim.now > sim.spreadAt + 1.4;
+    const introDone = sim.loaded && sim.spreadAt !== null && sim.now > sim.spreadAt + 1.7;
     app.classList.toggle('is-intro-done', introDone);
 
     // the travelling card arrives the first time the panel settles after the event was added
@@ -541,7 +907,19 @@
     progress($('quizProgress'), quiz.length, state.qi, cl.color, '#D6D6D6');
     $('quizQuestionText').textContent = q.question;
     $('quizHint').textContent = q.hint || '';
-    options($('quizOptions'), q.options, state.answers[state.qi], pickAnswer);
+    const answer = state.answers[state.qi];
+    options($('quizOptions'), q.options, answer, pickAnswer);
+    orbFor(answer !== undefined && q.motion ? q.motion[answer] : null, state.quiz + '/' + state.qi + '/' + answer);
+    const next = $('quizNext');
+    // staging order for the reveal (top → bottom, --i) and the exit (bottom → top, --o)
+    const stage = [$('quizProgress'), $('quizQuestion')].concat(Array.from($('quizOptions').children), [next]);
+    stage.forEach((n, k) => {
+      n.classList.add('q-stage');
+      n.style.setProperty('--i', k);
+      n.style.setProperty('--o', stage.length - 1 - k);
+    });
+    next.disabled = state.answers[state.qi] === undefined;
+    next.textContent = state.qi < quiz.length - 1 ? 'Next' : 'Done';
   }
 
   function renderTravel() {
@@ -667,6 +1045,7 @@
       dots.appendChild(b);
       dotNodes.push(b);
     });
+    scatterHome();
     sim.dots = C.clusters.map(() => ({ x: W / 2, y: H / 2, vx: 0, vy: 0, mode: 'load', th: Math.random() * Math.PI * 2 }));
 
     // dashboard routines
@@ -703,6 +1082,7 @@
 
     // controls
     $('back').addEventListener('click', back);
+    $('quizNext').addEventListener('click', nextQuestion);
     $('logo').addEventListener('click', () => { if (state.screen === 'dashboard') goTo('home'); });
     $('badge').addEventListener('click', () => show('basket', { menuOpen: false }));
     $('accessProtocol').addEventListener('click', () => show('protocol', { menuOpen: false, openRows: {} }));
