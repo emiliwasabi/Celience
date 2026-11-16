@@ -163,7 +163,11 @@
     switch (state.screen) {
       case 'safety': show('basket'); break;
       case 'product': goTo('dashboard'); break;
-      case 'map': goTo('dashboard'); break;
+      case 'map':
+        // the circles' labels fade out first, then the dots move on
+        app.classList.add('labels-out');
+        later(240, () => { goTo('dashboard'); app.classList.remove('labels-out'); });
+        break;
       case 'quiz': clearTimeout(timer); leaveQuiz(state.quiz, null); break;
       case 'cluster': clearTimeout(timer); leaveCluster(state.cluster); break;
       default: clearTimeout(timer); show('map');
@@ -418,9 +422,12 @@
     return cards;
   }
 
-  function openRoutine(productId, reason) {
+  // opened from a dashboard card: the product page takes that card's colour
+  function openRoutine(productId, reason, color) {
     tween(sim.panel, PANEL_TOP.map, 0.6);
-    show('product', { product: Object.assign({ id: productId }, C.products[productId], { reason: reason }), openRows: {} });
+    const product = Object.assign({ id: productId }, C.products[productId], { reason: reason });
+    if (color) product.color = color;
+    show('product', { product: product, openRows: {} });
   }
 
   function addToBasket() {
@@ -431,24 +438,32 @@
     later(2000, () => show('map'));               // "added" for 2 s, then the map
   }
 
+  // several answers possible; "None of the above" excludes the others. Next confirms.
   function pickSafety(k) {
     const s = C.safety;
-    if (k === s.confirmIndex) {
-      // demo path: "None of the above" confirms the order, then the dashboard after 2 s
-      state.safety = { [k]: true };
-      renderSafety();
-      later(350, () => {
-        show('order', { basket: [], inBasket: false });
-        later(2000, () => goTo('dashboard'));
-      });
-      return;
-    }
-    const n = Object.assign({}, state.safety);
-    delete n[s.confirmIndex];
-    n[k] = !n[k];
+    let n = Object.assign({}, state.safety);
+    if (k === s.confirmIndex) n = n[k] ? {} : { [k]: true };
+    else { delete n[s.confirmIndex]; n[k] = !n[k]; if (!n[k]) delete n[k]; }
     state.safety = n;
     renderSafety();
   }
+
+  function openSafety() {
+    show('safety', { safety: {} });
+    $('safety').classList.remove('is-revealed');
+    setTimeout(() => { if (state.screen === 'safety') $('safety').classList.add('is-revealed'); }, 150);
+  }
+
+  function confirmSafety() {
+    if (!Object.keys(state.safety).length) return;
+    $('safetyNext').disabled = true;
+    $('safety').classList.remove('is-revealed');      // the pieces leave, then the order is confirmed
+    later(450, () => {
+      show('order', { basket: [], inBasket: false });
+      later(2000, () => goTo('dashboard'));
+    });
+  }
+
 
   /* ------------------------------------------------------------------------
      Motion
@@ -1028,7 +1043,8 @@
     for (let i = 0; i < items.length; i++) {
       const k = items.length - i;                 // distance from the button row
       items[i].style.top = (state.menuOpen ? MENU_TOP - MENU_STEP * k : MENU_TOP) + 'px';
-      items[i].style.setProperty('--delay', (state.menuOpen ? (k - 1) * 50 : (items.length - k) * 30) + 'ms');
+      // opening: nearest first; closing: the exact reverse (farthest first), same rhythm
+      items[i].style.setProperty('--delay', (state.menuOpen ? (k - 1) * 50 : (items.length - k) * 50) + 'ms');
     }
 
     if (state.screen === 'quiz') renderQuiz();
@@ -1232,7 +1248,6 @@
     $('safetyTitle').textContent = C.safety.title;
     const list = $('safetyOptions');
     list.textContent = '';
-    list.classList.add('card--checklist');
     C.safety.options.forEach((text, k) => {
       const on = !!state.safety[k];
       const b = el('button', 'option' + (on ? ' is-selected' : ''));
@@ -1242,7 +1257,18 @@
       b.addEventListener('click', () => pickSafety(k));
       list.appendChild(b);
     });
+    const next = $('safetyNext');
+    const screen = $('safety');
+    const stage = [screen.querySelector('.progress'), screen.querySelector('.card--question')]
+      .concat(Array.from(list.children), [next]);
+    stage.forEach((n, k) => {
+      n.classList.add('q-stage');
+      n.style.setProperty('--i', k);
+      n.style.setProperty('--o', stage.length - 1 - k);
+    });
+    next.disabled = Object.keys(state.safety).length === 0;
   }
+
 
   /* ------------------------------------------------------------------------
      Build the static parts from content.json
@@ -1275,12 +1301,12 @@
     // dashboard routines
     const routines = $('routines');
     C.routines.forEach((r) => {
-      const b = el('button', 'routine', r.label);
+      const b = el('button', 'routine', C.products[r.product].name);   // same name as the page it opens
       b.type = 'button';
       b.style.setProperty('--card', clusterById(r.cluster).color);   // same colour as its circle
       if (r.image) b.appendChild(productImage(r.image));
       b.append(timePie(r.count, r.total, PIE_COLOR).svg, daysLeft(r.count));
-      b.addEventListener('click', () => openRoutine(r.product, r.reason));
+      b.addEventListener('click', () => openRoutine(r.product, r.reason, clusterById(r.cluster).color));
       routines.appendChild(b);
     });
     // the trip card fills the last free slot (bottom right) once the trip is added
@@ -1289,13 +1315,13 @@
     trip.id = 'tripCard';
     routines.appendChild(trip);
     const tc = C.events.travel.dashboardCard;
-    trip.textContent = tc.label;
+    trip.textContent = C.products.flight.name;                         // same name as the page it opens
     trip.style.setProperty('--card', clusterById(tc.cluster).color);
     const tp = timePie(tc.count, tc.total, PIE_COLOR);
     if (tc.image) trip.appendChild(productImage(tc.image));
     trip.append(tp.svg, daysLeft(tc.count));
     tripPie = tp.pie;
-    trip.addEventListener('click', () => openRoutine('flight', C.tripRoutineReason));
+    trip.addEventListener('click', () => openRoutine('flight', C.tripRoutineReason, clusterById(tc.cluster).color));
 
     // add an event menu
     const menu = $('eventMenu');
@@ -1303,7 +1329,6 @@
       const b = el('button', 'event-menu__item', item.label);
       b.type = 'button';
       b.style.width = item.width + 'px';
-      b.style.marginLeft = -item.width / 2 + 'px';     // centred above Add an event
       b.addEventListener('click', () => {
         if (item.opens === 'travel') openTravel();
         else { state.menuOpen = false; render(); }
@@ -1319,7 +1344,8 @@
     $('accessProtocol').addEventListener('click', () => show('protocol', { menuOpen: false, openRows: {} }));
     $('addEvent').addEventListener('click', () => { state.menuOpen = !state.menuOpen; render(); });
     $('addToBasket').addEventListener('click', addToBasket);
-    $('buy').addEventListener('click', () => show('safety', { safety: {} }));
+    $('buy').addEventListener('click', openSafety);
+    $('safetyNext').addEventListener('click', confirmSafety);
 
     // tap anywhere on the loader, screen 1 and the dashboard
     app.addEventListener('click', (e) => {

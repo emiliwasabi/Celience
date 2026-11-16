@@ -5,11 +5,11 @@
     { "id": "hormonal",  "label": "HORMONAL",  "color": "#EDB0FA", "todo": false, "pos": { "home": [94, 297],  "dashboard": [108, 247], "map": [121, 196] } },
     { "id": "immunity",  "label": "IMMUNITY",  "color": "#82F2B2", "todo": false, "pos": { "home": [269, 476], "dashboard": [222, 247], "map": [207, 282] } },
     { "id": "energy",    "label": "ENERGY",    "color": "#EAE559", "todo": false, "pos": { "home": [294, 506], "dashboard": [262, 247], "map": [314, 322] } },
-    { "id": "mind",      "label": "MIND",      "color": "#B4A2F9", "todo": false, "pos": { "home": [43, 794],  "dashboard": [44, 217],  "map": [63, 360] } },
+    { "id": "mind",      "label": "MIND",      "color": "#B4A2F9", "todo": true,  "pos": { "home": [43, 794],  "dashboard": [44, 217],  "map": [63, 360] } },
     { "id": "nutrition", "label": "NUTRITION", "color": "#95DF80", "todo": false, "pos": { "home": [308, 785], "dashboard": [369, 205], "map": [267, 421] } },
     { "id": "sleep",     "label": "SLEEP",     "color": "#697DDC", "todo": true,  "pos": { "home": [19, 824],  "dashboard": [19, 248],  "map": [121, 555] } },
     { "id": "skin",      "label": "SKIN",      "color": "#F1A2BA", "todo": false, "pos": { "home": [276, 759], "dashboard": [171, 248], "map": [286, 633] } },
-    { "id": "stress",    "label": "STRESS",    "color": "#EE7E7A", "todo": true,  "pos": { "home": [65, 740],  "dashboard": [371, 244], "map": [82, 697] } }
+    { "id": "movement",  "label": "MOVEMENT",  "color": "#EE7E7A", "todo": false, "pos": { "home": [65, 740],  "dashboard": [371, 244], "map": [82, 697] } }
   ],
 
   "loader": {
@@ -20,7 +20,7 @@
       [11.5637, 28.3836, 3.85458, 3.85458], [3.85458, 20.6745, 3.85458, 3.85458],
       [4.9058, 10.8629, 4.205, 3.85458],    [14.0166, 4.20506, 4.205, 4.205]
     ],
-    "spotOf": { "hormonal": 5, "immunity": 4, "energy": 3, "mind": 7, "nutrition": 0, "sleep": 2, "skin": 1, "stress": 6 }
+    "spotOf": { "hormonal": 5, "immunity": 4, "energy": 3, "mind": 7, "nutrition": 0, "sleep": 2, "skin": 1, "movement": 6 }
   },
 
   "quizzes": {
@@ -47,7 +47,7 @@
           null
         ] }
     ],
-    "stress": [
+    "mind": [
       { "question": "HOW OFTEN DO YOU FEEL\nUNDER PRESSURE?", "hint": "Over the last two weeks.",
         "options": ["Rarely", "Sometimes", "Often", "Very often", "I’d rather not answer"],
         "_motion": "Stress: the circle rests (calm, s) then shakes quickly (burst, s), over and over. The further down the answers, the shorter the calm and the longer the burst. speed = shake tempo, soft = how sharply it starts / stops (still eased), jitter = 0..1 nervous high-frequency shake, size = 0..1 of the float area. [min, max] = random each cycle.",
@@ -76,7 +76,7 @@
     "_comment": "Answer indexes that highlight a topic. Any highlighted topic adds Recovery Night to the protocol.",
     "sleep":  [ { "question": 0, "answers": [1, 2, 3], "topic": "falling asleep" },
                 { "question": 1, "answers": [2, 3, 4], "topic": "how rested you feel in the morning" } ],
-    "stress": [ { "question": 0, "answers": [1, 2, 3], "topic": "perceived pressure" },
+    "mind":   [ { "question": 0, "answers": [1, 2, 3], "topic": "perceived pressure" },
                 { "question": 1, "answers": [2, 3, 4], "topic": "switching off after demanding days" } ]
   },
 
@@ -104,11 +104,11 @@
 
   "_routines": "Dashboard cards: count = days left, total = length of the routine (days). cluster = whose circle colour the card takes. image (optional) = product photo shown bottom left, e.g. \"assets/products/recovery.png\" (transparent PNG works best).",
   "routines": [
-    { "label": "Training for marathon", "count": 24, "total": 84, "cluster": "stress", "product": "recovery",
+    { "label": "Training for marathon", "count": 24, "total": 84, "cluster": "sleep", "product": "recovery",
       "reason": "Part of your Training for marathon routine, taken each evening to support recovery between sessions." },
     { "label": "Curing skin issues", "count": 18, "total": 42, "cluster": "skin", "product": "skin",
       "reason": "Part of your Curing skin issues routine. Zinc, biotin and vitamin A contribute to the maintenance of normal skin." },
-    { "label": "Fighting sickness", "count": 13, "total": 30, "cluster": "immunity", "product": "micro",
+    { "label": "Fighting sickness", "count": 13, "total": 30, "cluster": "nutrition", "product": "micro",
       "reason": "Part of your Fighting sickness routine. Zinc, selenium and vitamin D contribute to the normal function of the immune system." }
   ],
   "clusterLabels": { "myData": "MY DATA", "articles": "ARTICLES" },
@@ -116,11 +116,11 @@
     "hormonal":  { "related": "CYCLE & MOOD" },
     "immunity":  { "related": "SEASONAL DEFENCES" },
     "energy":    { "related": "SLEEP & BIOLOGICAL RHYTHM" },
-    "mind":      { "related": "FOCUS & MEMORY" },
+    "mind":      { "related": "STRESS & SWITCHING OFF" },
     "nutrition": { "related": "DIGESTIVE COMFORT" },
     "sleep":     { "related": "STRESS & RECOVERY" },
     "skin":      { "related": "HYDRATION & BARRIER" },
-    "stress":    { "related": "SLEEP & SWITCHING OFF" }
+    "movement":  { "related": "TRAINING & RECOVERY" }
   },
   "tripRoutineReason": "Part of your trip to Singapour: before the flight, during the flight and the first nights after arrival.",
 

@@ -384,6 +384,8 @@ p, h1, h2 { margin: 0; }
   transition: opacity 400ms ease var(--label-delay, 0ms);
 }
 .app[data-screen="map"] .dot__label { opacity: 1; }
+/* leaving the map: the labels go first, quickly and without delay, before the dots move */
+.app[data-screen="map"].labels-out .dot__label { opacity: 0; transition: opacity 220ms ease; }
 
 /* --------------------------------------------------------------------------
    Map actions + Add an event menu
@@ -424,7 +426,7 @@ p, h1, h2 { margin: 0; }
 
 .event-menu__item {
   position: absolute;
-  left: 296.5px;                  /* centre of Add an event (227 + 139 / 2); app.js shifts each item by half its width */
+  right: var(--margin);           /* right-aligned with Add an event (its right edge = the 24 px margin) */
   top: 780px;                     /* moved up by app.js when open */
   height: var(--button-h);
   padding: 0;
@@ -438,9 +440,16 @@ p, h1, h2 { margin: 0; }
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
+  /* closing = the opening played backwards: they slide back down into the button (ease-in),
+     and only fade at the very end, once they are on it */
+  transition: top 420ms cubic-bezier(.8, 0, .8, .2) var(--delay, 0ms),
+              opacity 160ms ease calc(var(--delay, 0ms) + 280ms);
+}
+.app[data-screen="map"].menu-open .event-menu__item {
+  opacity: 1;
+  pointer-events: auto;
   transition: top 420ms var(--ease-out) var(--delay, 0ms), opacity 280ms ease var(--delay, 0ms);
 }
-.app[data-screen="map"].menu-open .event-menu__item { opacity: 1; pointer-events: auto; }
 
 /* --------------------------------------------------------------------------
    Screens
@@ -487,7 +496,10 @@ p, h1, h2 { margin: 0; }
   transition-timing-function: var(--ease-soft);
   transition-delay: calc(var(--o, 0) * 30ms), calc(var(--o, 0) * 30ms), 0ms, 0ms;
 }
-#quiz.is-revealed .q-stage {
+/* Your situation: neutral cards (no cluster colour) */
+#safety { --card: var(--violet); }
+
+.screen--quiz.is-revealed .q-stage {
   opacity: 1;
   transform: none;
   transition-duration: 560ms, 640ms, 300ms, 300ms;
@@ -619,8 +631,8 @@ p, h1, h2 { margin: 0; }
 .progress__segment.is-done::after { transform: scaleX(1); }
 /* quiz: the bar fills only once it has appeared (after the circle reached the centre),
    and empties quickly while the quiz leaves */
-#quiz:not(.is-revealed) .progress__segment::after { transform: scaleX(0); transition-duration: 300ms; }
-#quiz.is-revealed .progress__segment::after { transition-delay: 250ms; }
+.screen--quiz:not(.is-revealed) .progress__segment::after { transform: scaleX(0); transition-duration: 300ms; }
+.screen--quiz.is-revealed .progress__segment::after { transition-delay: 250ms; }
 
 /* --------------------------------------------------------------------------
    Cards

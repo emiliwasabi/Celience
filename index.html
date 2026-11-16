@@ -49,7 +49,7 @@
     </div>
     <div class="event-menu" id="eventMenu"></div>
 
-    <!-- Cluster quiz (Sleep, Stress) -->
+    <!-- Cluster quiz (Sleep, Mind) -->
     <!-- layout: progress + question on top, the cluster's circle in the middle,
          answers + Next button at the bottom -->
     <section class="screen screen--quiz" id="quiz" aria-live="polite">
@@ -87,12 +87,15 @@
     <button class="outline-button outline-button--bottom" id="buy" type="button">BUY</button>
 
     <!-- Safety check before ordering -->
-    <section class="screen screen--centered" id="safety">
-      <div class="progress"><span class="progress__segment is-done"></span></div>
-      <div class="stack">
-        <div class="card card--question"><p class="card__question" id="safetyTitle"></p></div>
-        <div class="card card--options" id="safetyOptions"></div>
+    <!-- Your situation: same layout as the cluster quizzes, with an empty middle (no circle) -->
+    <section class="screen screen--quiz" id="safety">
+      <div class="progress q-stage"><span class="progress__segment is-done"></span></div>
+      <div class="quiz__body stack">
+        <div class="card card--question q-stage"><p class="card__question" id="safetyTitle"></p></div>
+        <div class="quiz__orb" aria-hidden="true"></div>
+        <div class="quiz__options" id="safetyOptions" role="group"></div>
       </div>
+      <button class="outline-button quiz__next q-stage" id="safetyNext" type="button" disabled>Next</button>
     </section>
 
     <!-- Order confirmed -->
