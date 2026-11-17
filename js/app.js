@@ -1370,11 +1370,21 @@
   // mobile: scale it up or down to fill the phone (the space left around it is the app background).
   const MOBILE = window.matchMedia('(max-width: 600px), (pointer: coarse) and (max-width: 1024px)');
   function fit() {
-    const fill = Math.min(window.innerWidth / W, window.innerHeight / H);
-    const s = MOBILE.matches ? fill : Math.min(1, fill);
-    app.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+    // the area really visible (Safari's bars excluded)
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
+    const fill = Math.min(vw / W, vh / H);
+    if (MOBILE.matches) {
+      // pinned top centre (see style.css), scaled from its top edge
+      app.style.transform = 'translateX(-50%) scale(' + fill + ')';
+    } else {
+      const s = Math.min(1, fill);
+      app.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+    }
   }
   MOBILE.addEventListener('change', fit);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
 
   /* ------------------------------------------------------------------------
      Start

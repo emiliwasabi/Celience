@@ -56,9 +56,20 @@ body {
 @media (max-width: 600px), (pointer: coarse) and (max-width: 1024px) {
   html, body {
     background: var(--bg);
-    height: 100dvh;
+    height: 100%;
+    overflow: hidden;             /* nothing to scroll: the page is exactly the screen */
     overscroll-behavior: none;    /* no rubber-band scroll */
     touch-action: manipulation;   /* no double-tap zoom */
+  }
+  /* the screen is pinned to the top centre and takes no room in the page
+     (its full 844 px used to push the page taller than Safari's visible area → shifted down + scroll).
+     js/app.js scales it from its top edge to fit the visible area. */
+  .app {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform-origin: top center;
+    transform: translateX(-50%);
   }
 }
 
