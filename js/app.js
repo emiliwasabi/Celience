@@ -18,6 +18,8 @@
   const H_MIN = 660;
   const H_MAX = 1000;
   let H = BASE_H;
+  let U = 1;                                      // one design pixel, in real CSS pixels (see fit)
+  const px = (v) => (v * U).toFixed(2) + 'px';    // design units → CSS length
   const R = 20;                                   // dot radius
 
   // where the greeting and the dashboard panel sit for each layout (bottom-anchored ones follow H)
@@ -36,9 +38,9 @@
     PANEL_TOP.dashboard = Math.round(430 * H / BASE_H);
     PANEL_TOP.home = PANEL_TOP.map = H + 16;        // panel parked just below the screen
     MENU_TOP = H - 64;                              // the button row (24 margin + 40 button)
-    const appEl = document.getElementById('app');
-    appEl.style.setProperty('--frame-h', H + 'px');
-    appEl.style.setProperty('--panel-dash', PANEL_TOP.dashboard + 'px');
+    const root = document.documentElement.style;  // read by style.css as --fh / --pd units
+    root.setProperty('--fh', H);
+    root.setProperty('--pd', PANEL_TOP.dashboard);
   }
 
   // dots drifting: home & dashboard / map (gentler)
@@ -205,7 +207,7 @@
   function orbCenter() {
     const q = $('quiz');
     const d = $('quizOrb');
-    return [q.offsetLeft + d.offsetLeft + d.offsetWidth / 2, q.offsetTop + d.offsetTop + d.offsetHeight / 2];
+    return [(q.offsetLeft + d.offsetLeft + d.offsetWidth / 2) / U, (q.offsetTop + d.offsetTop + d.offsetHeight / 2) / U];
   }
 
   // to = fixed point, or a function giving a moving target (followed every frame)
@@ -307,8 +309,8 @@
     view.textContent = '';
     const node = (label, x, y, cls, k) => {
       const n = el('div', 'cnode ' + cls);
-      n.style.left = x + 'px';
-      n.style.top = y + 'px';
+      n.style.left = 'calc(' + x + ' * var(--u))';
+      n.style.top = 'calc(' + y + ' * var(--u))';
       n.style.setProperty('--o', k);
       n.append(el('span', 'cnode__label', label), el('span', 'cnode__circle'));
       view.appendChild(n);
@@ -1001,21 +1003,21 @@
     const x = dx * k + S.x + ix;
     const y = dy * k + S.y + iy;
     orb.pos = [x, y];
-    $('quizOrb').style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px)';
+    $('quizOrb').style.transform = 'translate(' + px(x) + ',' + px(y) + ')';
   }
 
   function draw() {
     if (state.screen === 'quiz') drawOrb();
     sim.dots.forEach((p, i) => {
-      dotNodes[i].style.transform = 'translate(' + (p.x - R).toFixed(2) + 'px,' + (p.y - R).toFixed(2) + 'px)';
+      dotNodes[i].style.transform = 'translate(' + px(p.x - R) + ',' + px(p.y - R) + ')';
       // colour comes in right after the loader ends, as the dots start to spread
       if (!p.lit && sim.loaded) {
         p.lit = true;
         dotNodes[i].classList.add('is-lit');
       }
     });
-    $('hello').style.top = sim.hello.v.toFixed(2) + 'px';
-    $('panel').style.top = panelTop().toFixed(2) + 'px';
+    $('hello').style.top = px(sim.hello.v);
+    $('panel').style.top = px(panelTop());
 
     // text and header appear once the dots have finished spreading
     const introDone = sim.loaded && sim.spreadAt !== null && sim.now > sim.spreadAt + 1.7;
@@ -1059,7 +1061,7 @@
                 : state.screen === 'cluster' ? clusterById(state.cluster).label
                 : SCREEN_TITLE[state.screen] || '';
     $('title').textContent = title;
-    $('brand').style.left = (layout === 'map' ? Math.round(W / 2 - (48 + title.length * 10) / 2) : 176) + 'px';
+    $('brand').style.left = 'calc(' + (layout === 'map' ? Math.round(W / 2 - (48 + title.length * 10) / 2) : 176) + ' * var(--u))';
     $('badgeCount').textContent = state.basket.length;
     $('badge').setAttribute('aria-label', 'Basket, ' + state.basket.length + ' items');
 
@@ -1073,7 +1075,7 @@
     const items = $('eventMenu').children;
     for (let i = 0; i < items.length; i++) {
       const k = items.length - i;                 // distance from the button row
-      items[i].style.top = (state.menuOpen ? MENU_TOP - MENU_STEP * k : MENU_TOP) + 'px';
+      items[i].style.top = 'calc(' + (state.menuOpen ? MENU_TOP - MENU_STEP * k : MENU_TOP) + ' * var(--u))';
       // opening: nearest first; closing: the exact reverse (farthest first), same rhythm
       items[i].style.setProperty('--delay', (state.menuOpen ? (k - 1) * 50 : (items.length - k) * 50) + 'ms');
     }
@@ -1359,7 +1361,7 @@
     C.events.menu.forEach((item) => {
       const b = el('button', 'event-menu__item', item.label);
       b.type = 'button';
-      b.style.width = item.width + 'px';
+      b.style.width = 'calc(' + item.width + ' * var(--u))';
       b.addEventListener('click', () => {
         if (item.opens === 'travel') openTravel();
         else { state.menuOpen = false; render(); }
@@ -1407,18 +1409,22 @@
     const vv = window.visualViewport;
     const vw = vv ? vv.width : window.innerWidth;
     const vh = vv ? vv.height : window.innerHeight;
+    // nothing is scaled: --u (one design pixel) is set so the 390-unit-wide screen
+    // is laid out at its real size — every length in style.css and here is N × --u
+    let h = BASE_H;
+    let u;
     if (MOBILE.matches) {
       // fill the width; the screen gets as tall as the phone (within H_MIN..H_MAX),
-      // a very short phone shrinks it a little instead of squeezing the content
-      const h = Math.round(clamp(vh * W / vw, H_MIN, H_MAX));
-      if (h !== H) relayout(h);
-      const s = Math.min(vw / W, vh / H);
-      app.style.transform = 'translateX(-50%) scale(' + s + ')';
+      // a very short phone gets slightly smaller units instead of squeezed content
+      h = Math.round(clamp(vh * W / vw, H_MIN, H_MAX));
+      u = Math.min(vw / W, vh / h);
     } else {
-      if (H !== BASE_H) relayout(BASE_H);
-      const s = Math.min(1, vw / W, vh / H);
-      app.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
+      u = Math.min(1, vw / W, vh / h);              // desktop: 1 unit = 1 px, smaller only if the window is
     }
+    const unitChanged = u !== U;
+    U = u;
+    document.documentElement.style.setProperty('--u', U + 'px');
+    if (h !== H || unitChanged) relayout(h);
   }
   MOBILE.addEventListener('change', fit);
   if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
