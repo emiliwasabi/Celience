@@ -106,8 +106,6 @@
   "routines": [
     { "label": "Training for marathon", "count": 24, "total": 84, "cluster": "sleep", "product": "recovery",
       "reason": "Part of your Training for marathon routine, taken each evening to support recovery between sessions." },
-    { "label": "Curing skin issues", "count": 18, "total": 42, "cluster": "skin", "product": "skin",
-      "reason": "Part of your Curing skin issues routine. Zinc, biotin and vitamin A contribute to the maintenance of normal skin." },
     { "label": "Fighting sickness", "count": 13, "total": 30, "cluster": "nutrition", "product": "micro",
       "reason": "Part of your Fighting sickness routine. Zinc, selenium and vitamin D contribute to the normal function of the immune system." }
   ],
@@ -126,14 +124,14 @@
 
   "products": {
     "recovery": {
-      "name": "Recovery Night", "color": "#D6DDF9",
+      "name": "Recovery Night", "cluster": "sleep", "color": "#697DDC",
       "clusters": ["Sleep onset support", "Sleep quality improvement", "Stress perception reduction", "Nervous system relaxation"],
       "description": "A formula designed to support the evening routine, with four selected actives playing complementary roles.",
       "science": "Built around 3 g of glycine, the amount explored in several small studies before bedtime, with encouraging results on some subjective sleep and next-day fatigue measures. L-theanine (200 mg), magnesium (120 mg) and lemon balm (300 mg) complete the formula. These results don’t guarantee an individual benefit.",
       "precautions": "Don’t exceed the indicated serving. Other supplements containing magnesium are taken into account in your protocol. If you take medication, are pregnant or have persistent sleep problems, ask a professional."
     },
     "flight": {
-      "name": "Flight Reset", "color": "#E9EAF9",
+      "name": "Flight Reset", "cluster": "energy", "color": "#EAE559",
       "clusters": ["Jet lag adaptation", "Travel fatigue reduction", "Hydration recovery"],
       "description": "A three-step nutritional protocol for long-haul travel: before the flight, during the flight and the first nights after arrival.",
       "science": "Pre-flight: L-theanine, magnesium and B6. In flight: electrolytes with supporting ingredients. Post-flight: Prosomnial®, a pistachio extract naturally containing melatonin. The overall effectiveness of this protocol against jet lag is not established.",

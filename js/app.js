@@ -90,6 +90,7 @@
     travelStep: 0, travelDone: false,
     menuOpen: false,
     basket: [], inBasket: false,
+    owned: {},                                    // products bought (ordered), by id
     safety: {},
     openRows: {},
     product: null
@@ -432,7 +433,7 @@
 
   function addToBasket() {
     if (state.inBasket) return;
-    const items = buildProtocol().map((c) => ({ name: c.name, color: c.color, description: c.description }));
+    const items = buildProtocol().map((c) => ({ id: c.id, name: c.name, color: c.color, description: c.description }));
     Object.assign(state, { inBasket: true, basket: items });
     render();
     later(2000, () => show('map'));               // "added" for 2 s, then the map
@@ -458,6 +459,10 @@
     if (!Object.keys(state.safety).length) return;
     $('safetyNext').disabled = true;
     $('safety').classList.remove('is-revealed');      // the pieces leave, then the order is confirmed
+    // what was in the basket is now owned (e.g. Flight Reset → its card appears on the dashboard)
+    const owned = Object.assign({}, state.owned);
+    state.basket.forEach((item) => { if (item.id) owned[item.id] = true; });
+    state.owned = owned;
     later(450, () => {
       show('order', { basket: [], inBasket: false });
       later(2000, () => goTo('dashboard'));
@@ -992,10 +997,12 @@
     const introDone = sim.loaded && sim.spreadAt !== null && sim.now > sim.spreadAt + 1.7;
     app.classList.toggle('is-intro-done', introDone);
 
-    // the travelling card arrives the first time the panel settles after the event was added
-    if (state.travelDone && state.screen === 'dashboard' && !sim.panel.tw) sim.tripSeen = true;
+    // the Flight Reset card is a notification: it only arrives once Flight Reset has been bought,
+    // the first time the dashboard panel settles after the order
+    const tripOwned = !!state.owned.flight;
+    if (tripOwned && state.screen === 'dashboard' && !sim.panel.tw) sim.tripSeen = true;
     const tripCard = $('tripCard');
-    const shown = state.travelDone && sim.tripSeen;
+    const shown = tripOwned && sim.tripSeen;
     if (shown && !tripCard.classList.contains('is-shown')) emptyPie(tripPie, 0.4);
     tripCard.classList.toggle('is-shown', shown);
   }
@@ -1375,6 +1382,11 @@
     .then((r) => r.json())
     .then((content) => {
       C = content;
+      // a product linked to a cluster ("cluster" in content.json) wears that circle's colour everywhere
+      Object.values(C.products).forEach((pr) => {
+        const cl = pr.cluster && C.clusters.find((c) => c.id === pr.cluster);
+        if (cl) pr.color = cl.color;
+      });
       build();
       render();
       loop();
