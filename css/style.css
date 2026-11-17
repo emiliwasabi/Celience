@@ -47,8 +47,19 @@ body {
   margin: 0;
   display: grid;
   place-items: center;
-  background: #E4E4E4;
+  background: #E4E4E4;            /* desktop: the phone screen sits on a grey page */
   overflow: hidden;
+}
+
+/* mobile: no grey page — the screen fills the phone (js/app.js scales it to fit),
+   and whatever is left around it is the app's own background, so it reads as one surface */
+@media (max-width: 600px), (pointer: coarse) and (max-width: 1024px) {
+  html, body {
+    background: var(--bg);
+    height: 100dvh;
+    overscroll-behavior: none;    /* no rubber-band scroll */
+    touch-action: manipulation;   /* no double-tap zoom */
+  }
 }
 
 button {

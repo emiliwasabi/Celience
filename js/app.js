@@ -1366,10 +1366,15 @@
      Fit the 390 × 844 frame to the window
      ---------------------------------------------------------------------- */
 
+  // desktop: shrink the 390 × 844 screen only if the window is too small (grey page around it).
+  // mobile: scale it up or down to fill the phone (the space left around it is the app background).
+  const MOBILE = window.matchMedia('(max-width: 600px), (pointer: coarse) and (max-width: 1024px)');
   function fit() {
-    const s = Math.min(1, window.innerWidth / W, window.innerHeight / H);
-    app.style.transform = s < 1 ? 'scale(' + s + ')' : '';
+    const fill = Math.min(window.innerWidth / W, window.innerHeight / H);
+    const s = MOBILE.matches ? fill : Math.min(1, fill);
+    app.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
   }
+  MOBILE.addEventListener('change', fit);
 
   /* ------------------------------------------------------------------------
      Start
