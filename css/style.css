@@ -223,7 +223,7 @@ p, h1, h2 { margin: 0; }
   left: 0;
   right: 0;
   top: 860px;                     /* moved by app.js */
-  height: 600px;
+  height: calc(var(--frame-h) + 40px);   /* always reaches the bottom, whatever the phone height */
   z-index: 1;
   background: var(--violet);
   border-radius: var(--radius) var(--radius) 0 0;
@@ -234,7 +234,7 @@ p, h1, h2 { margin: 0; }
   left: var(--margin);
   right: var(--margin);
   top: var(--margin);
-  height: 366px;                  /* fills the panel: 844 − 430 − 2 × 24 */
+  height: calc(var(--frame-h) - var(--panel-dash, 430px) - 48px);   /* fills the panel: screen − panel top − 2 × 24 */
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
@@ -534,7 +534,7 @@ p, h1, h2 { margin: 0; }
 }
 .quiz__orb {
   flex: 1;
-  min-height: 72px;
+  min-height: 24px;               /* short phones: the answers still fit */
   display: flex;
   align-items: center;
   justify-content: center;

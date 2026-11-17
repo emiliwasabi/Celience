@@ -11,17 +11,35 @@
      Constants
      ---------------------------------------------------------------------- */
 
+  // the screen is always 390 wide; its height follows the phone (see fit / setHeight):
+  // 844 on desktop (an iPhone 14 frame), between H_MIN and H_MAX on mobile
   const W = 390;
-  const H = 844;
+  const BASE_H = 844;
+  const H_MIN = 660;
+  const H_MAX = 1000;
+  let H = BASE_H;
   const R = 20;                                   // dot radius
 
-  // where the greeting and the dashboard panel sit for each layout
+  // where the greeting and the dashboard panel sit for each layout (bottom-anchored ones follow H)
   const HELLO_TOP = { home: 384, dashboard: 202, map: 60 };
   const PANEL_TOP = { home: 860, dashboard: 430, map: 860 };
 
   // the Add an event menu unfolds upwards from the button row
-  const MENU_TOP = 780;
+  let MENU_TOP = 780;
   const MENU_STEP = 39;
+
+  // everything that depends on the screen height
+  function setHeight(h) {
+    H = h;
+    HELLO_TOP.home = Math.round(H / 2 - 38);        // greeting stays centred on screen 1
+    HELLO_TOP.dashboard = Math.round(202 * H / BASE_H);   // profile: greeting and panel keep their proportions
+    PANEL_TOP.dashboard = Math.round(430 * H / BASE_H);
+    PANEL_TOP.home = PANEL_TOP.map = H + 16;        // panel parked just below the screen
+    MENU_TOP = H - 64;                              // the button row (24 margin + 40 button)
+    const appEl = document.getElementById('app');
+    appEl.style.setProperty('--frame-h', H + 'px');
+    appEl.style.setProperty('--panel-dash', PANEL_TOP.dashboard + 'px');
+  }
 
   // dots drifting: home & dashboard / map (gentler)
   const DRIFT = { force: 9, spring: 0.5, max: 16 };
@@ -483,13 +501,19 @@
     if (k >= 1) o.tw = null;
   }
 
-  function home(i, layout) { return C.clusters[i].pos[layout]; }
+  // map positions were drawn for an 844 px screen: stretch them to the real height
+  function home(i, layout) {
+    const p = C.clusters[i].pos[layout];
+    return layout === 'map' ? [p[0], p[1] * H / BASE_H] : p;
+  }
 
   // screen 1: scatter the dots at random (new layout on every page load).
   // They stay inside the screen, below the header, never overlap,
   // and keep clear of the "Hello, name" text in the middle.
   const SCATTER = { gap: 14, top: 120, bottom: 20, side: 16, hello: { x0: 70, x1: 320, y0: 360, y1: 470 } };
   function scatterHome() {
+    SCATTER.hello.y0 = HELLO_TOP.home - 24;         // keep clear of the greeting, wherever it sits
+    SCATTER.hello.y1 = HELLO_TOP.home + 86;
     const minD = 2 * R + SCATTER.gap;
     const placed = [];
     C.clusters.forEach((cl) => {
@@ -1368,18 +1392,31 @@
 
   // desktop: shrink the 390 × 844 screen only if the window is too small (grey page around it).
   // mobile: scale it up or down to fill the phone (the space left around it is the app background).
+  // new height (rotation, Safari bars…): move what is parked at the bottom, keep the current screen
+  function relayout(h) {
+    setHeight(h);
+    const layout = layoutOf(state.screen);
+    if (!sim.hello.tw) sim.hello.v = HELLO_TOP[layout];
+    if (!sim.panel.tw) sim.panel.v = PANEL_TOP[layout];
+    if (C) render();                                // before the content loads: nothing else placed yet
+  }
+
   const MOBILE = window.matchMedia('(max-width: 600px), (pointer: coarse) and (max-width: 1024px)');
   function fit() {
     // the area really visible (Safari's bars excluded)
     const vv = window.visualViewport;
     const vw = vv ? vv.width : window.innerWidth;
     const vh = vv ? vv.height : window.innerHeight;
-    const fill = Math.min(vw / W, vh / H);
     if (MOBILE.matches) {
-      // pinned top centre (see style.css), scaled from its top edge
-      app.style.transform = 'translateX(-50%) scale(' + fill + ')';
+      // fill the width; the screen gets as tall as the phone (within H_MIN..H_MAX),
+      // a very short phone shrinks it a little instead of squeezing the content
+      const h = Math.round(clamp(vh * W / vw, H_MIN, H_MAX));
+      if (h !== H) relayout(h);
+      const s = Math.min(vw / W, vh / H);
+      app.style.transform = 'translateX(-50%) scale(' + s + ')';
     } else {
-      const s = Math.min(1, fill);
+      if (H !== BASE_H) relayout(BASE_H);
+      const s = Math.min(1, vw / W, vh / H);
       app.style.transform = s !== 1 ? 'scale(' + s + ')' : '';
     }
   }
